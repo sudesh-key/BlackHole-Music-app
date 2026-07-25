@@ -5,8 +5,8 @@ import 'package:blackhole/Screens/Home/saavn.dart' as home_screen;
 import 'package:blackhole/Screens/Top Charts/top.dart' as top_screen;
 import 'package:blackhole/constants/countrycodes.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class MusicPlaybackPage extends StatefulWidget {
   final Function? callback;
@@ -17,14 +17,14 @@ class MusicPlaybackPage extends StatefulWidget {
 }
 
 class _MusicPlaybackPageState extends State<MusicPlaybackPage> {
-  String streamingMobileQuality = Hive.box('settings')
+  String streamingMobileQuality = AppDb.box('settings')
       .get('streamingQuality', defaultValue: '96 kbps') as String;
-  String streamingWifiQuality = Hive.box('settings')
+  String streamingWifiQuality = AppDb.box('settings')
       .get('streamingWifiQuality', defaultValue: '320 kbps') as String;
   String ytQuality =
-      Hive.box('settings').get('ytQuality', defaultValue: 'Low') as String;
+      AppDb.box('settings').get('ytQuality', defaultValue: 'Low') as String;
   String region =
-      Hive.box('settings').get('region', defaultValue: 'India') as String;
+      AppDb.box('settings').get('region', defaultValue: 'India') as String;
   List<String> languages = [
     'Hindi',
     'English',
@@ -43,7 +43,7 @@ class _MusicPlaybackPageState extends State<MusicPlaybackPage> {
     'Odia',
     'Assamese',
   ];
-  List preferredLanguage = Hive.box('settings')
+  List preferredLanguage = AppDb.box('settings')
       .get('preferredLanguage', defaultValue: ['Hindi'])?.toList() as List;
 
   @override
@@ -188,7 +188,7 @@ class _MusicPlaybackPageState extends State<MusicPlaybackPage> {
                                         () {
                                           preferredLanguage = checked;
                                           Navigator.pop(context);
-                                          Hive.box('settings').put(
+                                          AppDb.box('settings').put(
                                             'preferredLanguage',
                                             checked,
                                           );
@@ -283,7 +283,7 @@ class _MusicPlaybackPageState extends State<MusicPlaybackPage> {
                     setState(
                       () {
                         streamingMobileQuality = newValue;
-                        Hive.box('settings').put('streamingQuality', newValue);
+                        AppDb.box('settings').put('streamingQuality', newValue);
                       },
                     );
                   }
@@ -324,7 +324,7 @@ class _MusicPlaybackPageState extends State<MusicPlaybackPage> {
                     setState(
                       () {
                         streamingWifiQuality = newValue;
-                        Hive.box('settings')
+                        AppDb.box('settings')
                             .put('streamingWifiQuality', newValue);
                       },
                     );
@@ -366,7 +366,7 @@ class _MusicPlaybackPageState extends State<MusicPlaybackPage> {
                     setState(
                       () {
                         ytQuality = newValue;
-                        Hive.box('settings').put('ytQuality', newValue);
+                        AppDb.box('settings').put('ytQuality', newValue);
                       },
                     );
                   }
@@ -472,7 +472,7 @@ class _MusicPlaybackPageState extends State<MusicPlaybackPage> {
 class SpotifyCountry {
   Future<String> changeCountry({required BuildContext context}) async {
     String region =
-        Hive.box('settings').get('region', defaultValue: 'India') as String;
+        AppDb.box('settings').get('region', defaultValue: 'India') as String;
     if (!CountryCodes.localChartCodes.containsKey(region)) {
       region = 'India';
     }
@@ -488,16 +488,27 @@ class SpotifyCountry {
           borderRadius: BorderRadius.circular(
             20.0,
           ),
-          child: ListView.builder(
-            physics: const BouncingScrollPhysics(),
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(
-              0,
-              10,
-              0,
-              10,
-            ),
-            itemCount: countries.length,
+          child: RadioGroup<String>(
+            groupValue: region,
+            onChanged: (String? value) {
+              if (value == null) return;
+              top_screen.localSongs = [];
+              region = value;
+              top_screen.localFetched = false;
+              top_screen.localFetchFinished.value = false;
+              AppDb.box('settings').put('region', region);
+              Navigator.pop(context);
+            },
+            child: ListView.builder(
+              physics: const BouncingScrollPhysics(),
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(
+                0,
+                10,
+                0,
+                10,
+              ),
+              itemCount: countries.length,
             itemBuilder: (context, idx) {
               return ListTileTheme(
                 selectedColor: Theme.of(context).colorScheme.secondary,
@@ -505,29 +516,21 @@ class SpotifyCountry {
                   title: Text(
                     countries[idx],
                   ),
-                  leading: Radio(
+                  leading: Radio<String>(
                     value: countries[idx],
-                    groupValue: region,
-                    onChanged: (value) {
-                      top_screen.localSongs = [];
-                      region = countries[idx];
-                      top_screen.localFetched = false;
-                      top_screen.localFetchFinished.value = false;
-                      Hive.box('settings').put('region', region);
-                      Navigator.pop(context);
-                    },
                   ),
                   selected: region == countries[idx],
                   onTap: () {
                     top_screen.localSongs = [];
                     region = countries[idx];
                     top_screen.localFetchFinished.value = false;
-                    Hive.box('settings').put('region', region);
+                    AppDb.box('settings').put('region', region);
                     Navigator.pop(context);
                   },
                 ),
               );
-            },
+              },
+            ),
           ),
         );
       },

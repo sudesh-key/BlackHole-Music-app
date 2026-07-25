@@ -1,10 +1,13 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:ui';
+
+import 'package:flutter/services.dart';
 
 import 'package:blackhole/Screens/Player/audioplayer.dart';
 import 'package:blackhole/Services/youtube_services.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -22,7 +25,11 @@ Future<void> startBackgroundProcessing() async {
       isolateSendPort = message as SendPort;
       final appDocumentDirectoryPath =
           (await getApplicationDocumentsDirectory()).path;
-      isolateSendPort?.send(appDocumentDirectoryPath);
+      // Send docs path + root isolate token so the background isolate can
+      // use platform channels (path_provider is called by drift_flutter).
+      isolateSendPort?.send(
+        [appDocumentDirectoryPath, RootIsolateToken.instance!],
+      );
     } else {
       await audioHandler.customAction('refreshLink', {'newData': message});
     }
@@ -37,15 +44,21 @@ Future<void> _backgroundProcess(SendPort sendPort) async {
 
   await for (final message in isolateReceivePort) {
     if (!hiveInit) {
-      String path = message.toString();
+      final List<dynamic> initData = message as List<dynamic>;
+      final String path = initData[0] as String;
+      final RootIsolateToken token = initData[1] as RootIsolateToken;
+      BackgroundIsolateBinaryMessenger.ensureInitialized(token);
+      DartPluginRegistrant.ensureInitialized();
+      String? subDir;
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        path += '/BlackHole/Database';
+        subDir = 'BlackHole/Database';
       } else if (Platform.isIOS) {
-        path += '/Database';
+        subDir = 'Database';
       }
-      Hive.init(path);
-      await Hive.openBox('ytlinkcache');
-      await Hive.openBox('settings');
+      // Connects to the main isolate's drift server (shareAcrossIsolates).
+      await AppDb.init(basePath: path, subDir: subDir);
+      await AppDb.openBox('ytlinkcache');
+      await AppDb.openBox('settings');
       hiveInit = true;
       continue;
     }

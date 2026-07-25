@@ -18,10 +18,9 @@
  */
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:blackhole/Services/yt_music.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:html_unescape/html_unescape_small.dart';
 import 'package:http/http.dart';
 import 'package:logging/logging.dart';
@@ -40,6 +39,13 @@ class YouTubeServices {
         'Mozilla/5.0 (Windows NT 10.0; rv:96.0) Gecko/20100101 Firefox/96.0',
   };
   final YoutubeExplode yt = YoutubeExplode();
+
+  /// Stream clients in the order they are tried. `androidVr` and `android`
+  /// currently resolve in about two seconds each; the rest are fallbacks.
+  static final List<List<YoutubeApiClient>> _streamClientGroups = [
+    [YoutubeApiClient.androidVr, YoutubeApiClient.android],
+    [YoutubeApiClient.androidSdkless, YoutubeApiClient.ios, YoutubeApiClient.tv],
+  ];
 
   YouTubeServices._privateConstructor();
 
@@ -76,7 +82,7 @@ class YouTubeServices {
     }
     final Map? response = await formatVideo(
       video: vid,
-      quality: Hive.box('settings')
+      quality: AppDb.box('settings')
           .get(
             'ytQuality',
             defaultValue: 'Low',
@@ -84,7 +90,7 @@ class YouTubeServices {
           .toString(),
       data: data,
       getUrl: getUrl ?? true,
-      // preferM4a: Hive.box(
+      // preferM4a: AppDb.box(
       //         'settings')
       //     .get('preferM4a',
       //         defaultValue:
@@ -97,7 +103,7 @@ class YouTubeServices {
     String quality;
     try {
       quality =
-          Hive.box('settings').get('quality', defaultValue: 'Low').toString();
+          AppDb.box('settings').get('quality', defaultValue: 'Low').toString();
     } catch (e) {
       quality = 'Low';
     }
@@ -127,61 +133,142 @@ class YouTubeServices {
       paths['music'].toString(),
     );
     try {
-      final Response response = await get(link);
+      final Response response = await get(link, headers: headers);
       if (response.statusCode != 200) {
         return {};
       }
-      final String searchResults =
-          RegExp(r'(\"contents\":{.*?}),\"metadata\"', dotAll: true)
-              .firstMatch(response.body)![1]!;
-      final Map data = json.decode('{$searchResults}') as Map;
+      // Extract the full ytInitialData object with a balanced-brace scan;
+      // regex slicing breaks whenever YouTube nests a "metadata" key.
+      final String body = response.body;
+      final int keyIndex = body.indexOf('ytInitialData');
+      if (keyIndex == -1) {
+        Logger.root.severe('getMusicHome: ytInitialData not found');
+        return {};
+      }
+      final String? jsonString =
+          _extractBalancedJson(body, body.indexOf('{', keyIndex));
+      if (jsonString == null) {
+        Logger.root.severe('getMusicHome: failed to extract ytInitialData');
+        return {};
+      }
+      final Map data = json.decode(jsonString) as Map;
 
-      final List result = data['contents']['twoColumnBrowseResultsRenderer']
-              ['tabs'][0]['tabRenderer']['content']['sectionListRenderer']
-          ['contents'] as List;
+      // Null-tolerant traversal: YouTube reshuffles these renderer names
+      // periodically. On failure, log the keys that ARE present so the
+      // parser can be updated from the device log alone.
+      // YouTube serves either the legacy sectionListRenderer or the newer
+      // richGridRenderer depending on rollout; accept whichever has content.
+      List? sectionContents = _dig(data, [
+        'contents',
+        'twoColumnBrowseResultsRenderer',
+        'tabs',
+        0,
+        'tabRenderer',
+        'content',
+        'sectionListRenderer',
+        'contents',
+      ]) as List?;
+      sectionContents ??= _dig(data, [
+        'contents',
+        'twoColumnBrowseResultsRenderer',
+        'tabs',
+        0,
+        'tabRenderer',
+        'content',
+        'richGridRenderer',
+        'contents',
+      ]) as List?;
+      if (sectionContents == null) {
+        final dynamic contentsNode = data['contents'];
+        final dynamic tabContent = _dig(data, [
+          'contents',
+          'twoColumnBrowseResultsRenderer',
+          'tabs',
+          0,
+          'tabRenderer',
+          'content',
+        ]);
+        Logger.root.severe(
+          'getMusicHome: unexpected structure. '
+          'root: ${data.keys.toList()}, '
+          'contents: ${contentsNode is Map ? contentsNode.keys.toList() : contentsNode.runtimeType}, '
+          'tabContent: ${tabContent is Map ? tabContent.keys.toList() : tabContent.runtimeType}',
+        );
+        return {};
+      }
+      final List result = sectionContents;
 
-      final List headResult = data['header']['carouselHeaderRenderer']
-          ['contents'][0]['carouselItemRenderer']['carouselItems'] as List;
+      final List headResult = _dig(data, [
+            'header',
+            'carouselHeaderRenderer',
+            'contents',
+            0,
+            'carouselItemRenderer',
+            'carouselItems',
+          ]) as List? ??
+          [];
+      if (headResult.isEmpty) {
+        final dynamic headerNode = data['header'];
+        Logger.root.info(
+          'getMusicHome: no header carousel. '
+          'header: ${headerNode is Map ? headerNode.keys.toList() : headerNode.runtimeType}',
+        );
+      }
 
-      final List shelfRenderer = result.map((element) {
-        return element['itemSectionRenderer']['contents'][0]['shelfRenderer'];
-      }).toList();
+      final List shelfRenderer = result
+          .map((element) {
+            // Legacy layout.
+            final dynamic legacy = _dig(
+              element,
+              ['itemSectionRenderer', 'contents', 0, 'shelfRenderer'],
+            );
+            if (legacy != null) return legacy;
+            // richGridRenderer layout.
+            return _dig(element, ['richSectionRenderer', 'content', 'richShelfRenderer']);
+          })
+          .where((element) => element != null)
+          .toList();
 
       final List finalResult = shelfRenderer.map((element) {
-        final playlistItems = element['title']['runs'][0]['text'].trim() ==
-                    'Charts' ||
-                element['title']['runs'][0]['text'].trim() == 'Classements'
-            ? formatChartItems(
-                element['content']['horizontalListRenderer']['items'] as List,
-              )
-            : element['title']['runs'][0]['text']
-                        .toString()
-                        .contains('Music Videos') ||
-                    element['title']['runs'][0]['text']
-                        .toString()
-                        .contains('Nouveaux clips') ||
-                    element['title']['runs'][0]['text']
-                        .toString()
-                        .contains('En Musique Avec Moi') ||
-                    element['title']['runs'][0]['text']
-                        .toString()
-                        .contains('Performances Uniques')
-                ? formatVideoItems(
-                    element['content']['horizontalListRenderer']['items']
-                        as List,
-                  )
-                : formatItems(
-                    element['content']['horizontalListRenderer']['items']
-                        as List,
-                  );
+        final String shelfTitle = (_dig(element, ['title', 'runs', 0, 'text']) ??
+                _dig(element, ['title', 'simpleText']) ??
+                '')
+            .toString()
+            .trim();
+        final List items = (_dig(
+                  element,
+                  ['content', 'horizontalListRenderer', 'items'],
+                ) as List?) ??
+            (_dig(element, ['contents']) as List?) ??
+            [];
+        if (shelfTitle.isEmpty || items.isEmpty) {
+          final dynamic contentNode = element['content'];
+          Logger.root.info(
+            'getMusicHome: skipping shelf "$shelfTitle" '
+            '(content: ${contentNode is Map ? contentNode.keys.toList() : contentNode.runtimeType})',
+          );
+          return null;
+        }
+        final bool isChart =
+            shelfTitle == 'Charts' || shelfTitle == 'Classements';
+        final playlistItems = _hasLockupItems(items)
+            ? formatLockupItems(items, isChart: isChart)
+            : isChart
+                ? formatChartItems(items)
+                : shelfTitle.contains('Music Videos') ||
+                        shelfTitle.contains('Nouveaux clips') ||
+                        shelfTitle.contains('En Musique Avec Moi') ||
+                        shelfTitle.contains('Performances Uniques')
+                    ? formatVideoItems(items)
+                    : formatItems(items);
         if (playlistItems.isNotEmpty) {
           return {
-            'title': element['title']['runs'][0]['text'],
+            'title': shelfTitle,
             'playlists': playlistItems,
           };
         } else {
           Logger.root.severe(
-            "got null in getMusicHome for '${element['title']['runs'][0]['text']}'",
+            "got empty playlist in getMusicHome for '$shelfTitle'",
           );
           return null;
         }
@@ -216,6 +303,58 @@ class YouTubeServices {
       Logger.root.severe('Error in getSearchSuggestions: $e');
       return [];
     }
+  }
+
+  /// Walks [path] (map keys / list indices) through nested JSON, returning
+  /// null as soon as any step doesn't match. Avoids `?[` chains, which are
+  /// ambiguous with the conditional operator in some contexts.
+  static dynamic _dig(dynamic node, List<dynamic> path) {
+    dynamic current = node;
+    for (final dynamic key in path) {
+      if (current is Map) {
+        current = current[key];
+      } else if (current is List && key is int && key < current.length) {
+        current = current[key];
+      } else {
+        return null;
+      }
+    }
+    return current;
+  }
+
+  /// Returns the JSON object starting at [start] (must be '{'), found by
+  /// scanning with brace balancing while respecting string literals.
+  static String? _extractBalancedJson(String source, int start) {
+    if (start < 0 || start >= source.length || source[start] != '{') {
+      return null;
+    }
+    int depth = 0;
+    bool inString = false;
+    bool escaped = false;
+    for (int i = start; i < source.length; i++) {
+      final String char = source[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char == r'\') {
+          escaped = true;
+        } else if (char == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (char == '"') {
+        inString = true;
+      } else if (char == '{') {
+        depth++;
+      } else if (char == '}') {
+        depth--;
+        if (depth == 0) {
+          return source.substring(start, i + 1);
+        }
+      }
+    }
+    return null;
   }
 
   List formatVideoItems(List itemsList) {
@@ -313,6 +452,103 @@ class YouTubeServices {
     }
   }
 
+  /// True when a shelf serves the newer `lockupViewModel` items instead of the
+  /// grid/compact renderers.
+  static bool _hasLockupItems(List itemsList) =>
+      _dig(itemsList.first, [
+        'richItemRenderer',
+        'content',
+        'lockupViewModel',
+      ]) !=
+      null;
+
+  /// Joins the text parts of the metadata row at [index], e.g. the channel
+  /// name (row 0) or `26m views • 4 days ago` (row 1).
+  static String _rowText(List rows, int index) {
+    final List? parts = _dig(rows, [index, 'metadataParts']) as List?;
+    if (parts == null) return '';
+    return parts
+        .map((part) => (_dig(part, ['text', 'content']) ?? '').toString())
+        .where((text) => text.isNotEmpty)
+        .join(' • ');
+  }
+
+  /// Track count from the thumbnail badge, e.g. `50 songs` -> `50`.
+  static String _badgeCount(Map? thumbnail) {
+    final List overlays = (_dig(thumbnail, ['overlays']) as List?) ?? [];
+    for (final overlay in overlays) {
+      final dynamic text = _dig(overlay, [
+        'thumbnailOverlayBadgeViewModel',
+        'thumbnailBadges',
+        0,
+        'thumbnailBadgeViewModel',
+        'text',
+      ]);
+      if (text != null) {
+        return RegExp(r'[\d,]+').firstMatch(text.toString())?.group(0) ?? '';
+      }
+    }
+    return '';
+  }
+
+  /// Formats `lockupViewModel` items, which replaced `compactStationRenderer`,
+  /// `gridPlaylistRenderer` and `gridVideoRenderer` on the music page.
+  List formatLockupItems(List itemsList, {bool isChart = false}) {
+    try {
+      final List result = [];
+      for (final item in itemsList) {
+        final Map? lockup = _dig(
+          item,
+          ['richItemRenderer', 'content', 'lockupViewModel'],
+        ) as Map?;
+        if (lockup == null) continue;
+        final bool isVideo =
+            lockup['contentType'] == 'LOCKUP_CONTENT_TYPE_VIDEO';
+        final Map? thumbnail = isVideo
+            ? _dig(lockup, ['contentImage', 'thumbnailViewModel']) as Map?
+            : _dig(lockup, [
+                'contentImage',
+                'collectionThumbnailViewModel',
+                'primaryThumbnail',
+                'thumbnailViewModel',
+              ]) as Map?;
+        final List? sources = _dig(thumbnail, ['image', 'sources']) as List?;
+        final dynamic title = _dig(
+          lockup,
+          ['metadata', 'lockupMetadataViewModel', 'title', 'content'],
+        );
+        final dynamic id = lockup['contentId'];
+        if (title == null || id == null || sources == null || sources.isEmpty) {
+          continue;
+        }
+        final List rows = (_dig(lockup, [
+              'metadata',
+              'lockupMetadataViewModel',
+              'metadata',
+              'contentMetadataViewModel',
+              'metadataRows',
+            ]) as List?) ??
+            [];
+        result.add({
+          'title': title,
+          'type': isVideo
+              ? 'video'
+              : isChart
+                  ? 'chart'
+                  : 'playlist',
+          'description': _rowText(rows, 0),
+          'count': isVideo ? _rowText(rows, 1) : _badgeCount(thumbnail),
+          if (isVideo) 'videoId': id else 'playlistId': id,
+          'image': sources.last['url'],
+        });
+      }
+      return result;
+    } catch (e) {
+      Logger.root.severe('Error in formatLockupItems: $e');
+      return List.empty();
+    }
+  }
+
   List formatHeadItems(List itemsList) {
     try {
       final List result = itemsList.map((e) {
@@ -370,6 +606,10 @@ class YouTubeServices {
     String expireAt = '0';
     if (getUrl) {
       urlsData = await getYtStreamUrls(video.id.value);
+      if (urlsData.isEmpty) {
+        Logger.root.severe('No playable stream for ${video.id.value}');
+        return null;
+      }
       final Map finalUrlData =
           quality == 'High' ? urlsData.last : urlsData.first;
       finalUrl = finalUrlData['url'].toString();
@@ -450,7 +690,13 @@ class YouTubeServices {
   }
 
   Future<List<Map>> fetchSearchResults(String query) async {
-    final List<Video> searchResults = await yt.search.search(query);
+    final List<Video> searchResults;
+    try {
+      searchResults = await yt.search.search(query);
+    } catch (e) {
+      Logger.root.severe('Error in fetchSearchResults: $e');
+      return List.empty();
+    }
     final List<Map> videoResult = [];
     for (final Video vid in searchResults) {
       final res = await formatVideo(video: vid, quality: 'High', getUrl: false);
@@ -533,8 +779,8 @@ class YouTubeServices {
       List<Map> urlData = [];
 
       // check cache first
-      if (Hive.box('ytlinkcache').containsKey(videoId)) {
-        final cachedData = Hive.box('ytlinkcache').get(videoId);
+      if (AppDb.box('ytlinkcache').containsKey(videoId)) {
+        final cachedData = AppDb.box('ytlinkcache').get(videoId);
         if (cachedData is List) {
           int minExpiredAt = 0;
           for (final e in cachedData) {
@@ -551,7 +797,7 @@ class YouTubeServices {
           } else {
             // giving cache link
             Logger.root.info('cache found for $videoId');
-            urlData = cachedData as List<Map>;
+            urlData = List<Map>.from(cachedData);
           }
         } else {
           // old version cache is present
@@ -563,7 +809,7 @@ class YouTubeServices {
       }
 
       try {
-        await Hive.box('ytlinkcache')
+        await AppDb.box('ytlinkcache')
             .put(
               videoId,
               urlData,
@@ -610,19 +856,36 @@ class YouTubeServices {
     String videoId, {
     bool onlyMp4 = false,
   }) async {
-    final StreamManifest manifest =
-        await yt.videos.streamsClient.getManifest(VideoId(videoId));
+    // Several innertube clients are kept so stream extraction survives cipher
+    // and API changes, but `getManifest` walks every client it is handed and a
+    // failing one costs seconds of retries, so they are tried in groups and the
+    // fallbacks only run when the primary group yields nothing.
+    StreamManifest? manifest;
+    for (final List<YoutubeApiClient> clients in _streamClientGroups) {
+      try {
+        manifest = await yt.videos.streamsClient
+            .getManifest(VideoId(videoId), ytClients: clients);
+        break;
+      } catch (e) {
+        Logger.root.info('Stream clients failed for $videoId: $e');
+      }
+    }
+    if (manifest == null) {
+      Logger.root.severe('No stream manifest for $videoId');
+      return [];
+    }
     final List<AudioOnlyStreamInfo> sortedStreamInfo = manifest.audioOnly
         .toList()
       ..sort((a, b) => a.bitrate.compareTo(b.bitrate));
-    if (onlyMp4 || Platform.isIOS || Platform.isMacOS) {
-      final List<AudioOnlyStreamInfo> m4aStreams = sortedStreamInfo
-          .where((element) => element.audioCodec.contains('mp4'))
-          .toList();
+    // Opus/WebM streams are served with `gir=yes` and answer a range-less GET
+    // with 403 — which is exactly the request just_audio's caching proxy makes,
+    // so prefer m4a on every platform, not just Apple ones.
+    final List<AudioOnlyStreamInfo> m4aStreams = sortedStreamInfo
+        .where((element) => element.audioCodec.contains('mp4'))
+        .toList();
 
-      if (m4aStreams.isNotEmpty) {
-        return m4aStreams;
-      }
+    if (m4aStreams.isNotEmpty) {
+      return m4aStreams;
     }
 
     return sortedStreamInfo;

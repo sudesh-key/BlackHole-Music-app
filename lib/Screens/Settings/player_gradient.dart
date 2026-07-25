@@ -19,9 +19,9 @@
 
 import 'package:blackhole/Helpers/config.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class PlayerGradientSelection extends StatefulWidget {
   const PlayerGradientSelection({super.key});
@@ -54,7 +54,7 @@ class _PlayerGradientSelectionState extends State<PlayerGradientSelection> {
   };
   final List<Color?> gradientColor = [Colors.lightGreen, Colors.teal];
   final MyTheme currentTheme = GetIt.I<MyTheme>();
-  String gradientType = Hive.box('settings')
+  String gradientType = AppDb.box('settings')
       .get('gradientType', defaultValue: 'halfDark')
       .toString();
 
@@ -84,7 +84,7 @@ class _PlayerGradientSelectionState extends State<PlayerGradientSelection> {
                   onTap: () {
                     setState(() {
                       gradientType = type;
-                      Hive.box('settings').put('gradientType', type);
+                      AppDb.box('settings').put('gradientType', type);
                     });
                   },
                   child: SizedBox(

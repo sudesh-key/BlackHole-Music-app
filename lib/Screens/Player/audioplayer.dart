@@ -44,15 +44,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flip_card/flip_card.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:flutter_lyric/lyric_ui/ui_netease.dart';
-import 'package:flutter_lyric/lyrics_model_builder.dart';
-import 'package:flutter_lyric/lyrics_reader_model.dart';
-import 'package:flutter_lyric/lyrics_reader_widget.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:flutter_lyric/flutter_lyric.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:mdi_icons/mdi_icons.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
@@ -65,11 +62,11 @@ class PlayScreen extends StatefulWidget {
 }
 
 class _PlayScreenState extends State<PlayScreen> {
-  final String gradientType = Hive.box('settings')
+  final String gradientType = AppDb.box('settings')
       .get('gradientType', defaultValue: 'halfDark')
       .toString();
   final bool getLyricsOnline =
-      Hive.box('settings').get('getLyricsOnline', defaultValue: true) as bool;
+      AppDb.box('settings').get('getLyricsOnline', defaultValue: true) as bool;
 
   final MyTheme currentTheme = GetIt.I<MyTheme>();
   final ValueNotifier<List<Color?>?> gradientColor =
@@ -276,8 +273,11 @@ class _PlayScreenState extends State<PlayScreen> {
                           if (!isSharePopupShown) {
                             isSharePopupShown = true;
 
-                            await Share.share(
-                              mediaItem.extras!['perma_url'].toString(),
+                            await SharePlus.instance
+                                .share(
+                              ShareParams(
+                                text: mediaItem.extras!['perma_url'].toString(),
+                              ),
                             ).whenComplete(() {
                               Timer(const Duration(milliseconds: 600), () {
                                 isSharePopupShown = false;
@@ -424,7 +424,7 @@ class _PlayScreenState extends State<PlayScreen> {
                                   ],
                                 ),
                               ),
-                              if (Hive.box('settings').get(
+                              if (AppDb.box('settings').get(
                                 'supportEq',
                                 defaultValue: false,
                               ) as bool)
@@ -507,7 +507,7 @@ class _PlayScreenState extends State<PlayScreen> {
                                   ],
                                 ),
                               ),
-                              if (Hive.box('settings').get(
+                              if (AppDb.box('settings').get(
                                 'supportEq',
                                 defaultValue: false,
                               ) as bool)
@@ -754,7 +754,7 @@ class ControlButtons extends StatelessWidget {
                 : miniplayer
                     ? ValueListenableBuilder(
                         valueListenable:
-                            Hive.box('Favorite Songs').listenable(),
+                            AppDb.box('Favorite Songs').listenable(),
                         builder:
                             (BuildContext context, Box box, Widget? widget) {
                           return LikeButton(
@@ -772,7 +772,7 @@ class ControlButtons extends StatelessWidget {
               stream: audioHandler.queueState,
               builder: (context, snapshot) {
                 final queueState = snapshot.data;
-                final resetOnSkip = Hive.box('settings')
+                final resetOnSkip = AppDb.box('settings')
                     .get('resetOnSkip', defaultValue: false) as bool;
                 return IconButton(
                   icon: const Icon(Icons.skip_previous_rounded),
@@ -1206,9 +1206,25 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
     'source': '',
     'type': '',
   };
-  final lyricUI = UINetease();
-  LyricsReaderModel? lyricsReaderModel;
+  final LyricController lyricController = LyricController();
+  StreamSubscription<Duration>? _positionSubscription;
   bool flipped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Drive lyric highlighting/scrolling from the player position.
+    _positionSubscription = AudioService.position.listen((Duration position) {
+      lyricController.setProgress(position);
+    });
+  }
+
+  @override
+  void dispose() {
+    _positionSubscription?.cancel();
+    lyricController.dispose();
+    super.dispose();
+  }
 
   void fetchLyrics() {
     Logger.root.info('Fetching lyrics for ${widget.mediaItem.title}');
@@ -1231,9 +1247,7 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
             lyrics['id'] = widget.mediaItem.id;
             done.value = true;
             lyricsSource.value = lyrics['source'].toString();
-            lyricsReaderModel = LyricsModelBuilder.create()
-                .bindLyricToMain(lyrics['lyrics'].toString())
-                .getModel();
+            lyricController.loadLyric(lyrics['lyrics'].toString());
           });
         } else {
           Logger.root.info('Lyrics found offline');
@@ -1243,9 +1257,7 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
           lyrics['id'] = widget.mediaItem.id;
           done.value = true;
           lyricsSource.value = lyrics['source'].toString();
-          lyricsReaderModel = LyricsModelBuilder.create()
-              .bindLyricToMain(lyrics['lyrics'].toString())
-              .getModel();
+          lyricController.loadLyric(lyrics['lyrics'].toString());
         }
       });
     } else {
@@ -1265,9 +1277,7 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
         lyrics['id'] = widget.mediaItem.id;
         done.value = true;
         lyricsSource.value = lyrics['source'].toString();
-        lyricsReaderModel = LyricsModelBuilder.create()
-            .bindLyricToMain(lyrics['lyrics'].toString())
-            .getModel();
+        lyricController.loadLyric(lyrics['lyrics'].toString());
       });
     }
   }
@@ -1350,30 +1360,10 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
                                             fontSize: 16.0,
                                           ),
                                         )
-                                      : StreamBuilder<Duration>(
-                                          stream: AudioService.position,
-                                          builder: (context, snapshot) {
-                                            final position =
-                                                snapshot.data ?? Duration.zero;
-                                            return LyricsReader(
-                                              model: lyricsReaderModel,
-                                              position: position.inMilliseconds,
-                                              lyricUi:
-                                                  UINetease(highlight: false),
-                                              playing: true,
-                                              size: Size(
-                                                widget.width * 0.85,
-                                                widget.width * 0.85,
-                                              ),
-                                              emptyBuilder: () => Center(
-                                                child: Text(
-                                                  'Lyrics Not Found',
-                                                  style: lyricUI
-                                                      .getOtherMainTextStyle(),
-                                                ),
-                                              ),
-                                            );
-                                          },
+                                      : LyricView(
+                                          controller: lyricController,
+                                          width: widget.width * 0.85,
+                                          height: widget.width * 0.85,
                                         )
                               : child!;
                         },
@@ -1412,7 +1402,7 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10.0),
                     ),
-                    color: Theme.of(context).cardColor.withOpacity(0.6),
+                    color: Theme.of(context).cardColor.withValues(alpha: 0.6),
                     clipBehavior: Clip.antiAlias,
                     child: IconButton(
                       tooltip: AppLocalizations.of(context)!.copy,
@@ -1425,7 +1415,7 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
                       },
                       icon: const Icon(Icons.copy_rounded),
                       color:
-                          Theme.of(context).iconTheme.color!.withOpacity(0.6),
+                          Theme.of(context).iconTheme.color!.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -1437,9 +1427,9 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
             builder: (context, snapshot) {
               final queueState = snapshot.data ?? QueueState.empty;
 
-              final bool enabled = Hive.box('settings')
+              final bool enabled = AppDb.box('settings')
                   .get('enableGesture', defaultValue: true) as bool;
-              final volumeGestureEnabled = Hive.box('settings')
+              final volumeGestureEnabled = AppDb.box('settings')
                   .get('volumeGestureEnabled', defaultValue: false) as bool;
 
               return ValueListenableBuilder(
@@ -1476,7 +1466,7 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
                                         inactiveTrackColor: Theme.of(context)
                                             .colorScheme
                                             .secondary
-                                            .withOpacity(0.4),
+                                            .withValues(alpha: 0.4),
                                         trackShape:
                                             const RoundedRectSliderTrackShape(),
                                         disabledActiveTrackColor:
@@ -1487,7 +1477,7 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
                                             Theme.of(context)
                                                 .colorScheme
                                                 .secondary
-                                                .withOpacity(0.4),
+                                                .withValues(alpha: 0.4),
                                       ),
                                       child: ExcludeSemantics(
                                         child: Slider(
@@ -1677,8 +1667,8 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
                                 decoration: BoxDecoration(
                                   gradient: RadialGradient(
                                     colors: [
-                                      Colors.black.withOpacity(0.4),
-                                      Colors.black.withOpacity(0.7),
+                                      Colors.black.withValues(alpha: 0.4),
+                                      Colors.black.withValues(alpha: 0.7),
                                     ],
                                   ),
                                 ),
@@ -1795,12 +1785,12 @@ class _ArtWorkWidgetState extends State<ArtWorkWidget> {
                                         colors: value == 1
                                             ? [
                                                 Colors.transparent,
-                                                Colors.black.withOpacity(0.4),
-                                                Colors.black.withOpacity(0.7),
+                                                Colors.black.withValues(alpha: 0.4),
+                                                Colors.black.withValues(alpha: 0.7),
                                               ]
                                             : [
-                                                Colors.black.withOpacity(0.7),
-                                                Colors.black.withOpacity(0.4),
+                                                Colors.black.withValues(alpha: 0.7),
+                                                Colors.black.withValues(alpha: 0.4),
                                                 Colors.transparent,
                                               ],
                                       ),
@@ -1891,7 +1881,7 @@ class NameNControls extends StatelessWidget {
     final double nowplayingBoxHeight = min(70, height * 0.15);
     // height > 500 ? height * 0.4 : height * 0.15;
     // final double minNowplayingBoxHeight = height * 0.15;
-    final String gradientType = Hive.box('settings')
+    final String gradientType = AppDb.box('settings')
         .get('gradientType', defaultValue: 'halfDark')
         .toString();
     final List<String> artists = mediaItem.artist.toString().split(', ');
@@ -2154,7 +2144,7 @@ class NameNControls extends StatelessWidget {
                                     tooltip:
                                         'Repeat ${texts[(index + 1) % texts.length]}',
                                     onPressed: () async {
-                                      await Hive.box('settings').put(
+                                      await AppDb.box('settings').put(
                                         'repeatMode',
                                         texts[(index + 1) % texts.length],
                                       );
@@ -2202,18 +2192,15 @@ class NameNControls extends StatelessWidget {
             margin: EdgeInsets.zero,
             padding: EdgeInsets.zero,
             boxShadow: const [],
-            color: ['fullLight', 'fullMix'].contains(gradientType)
-                ? Theme.of(context).brightness == Brightness.dark
-                    ? const Color.fromRGBO(0, 0, 0, 0.05)
-                    : const Color.fromRGBO(255, 255, 255, 0.05)
-                : Theme.of(context).brightness == Brightness.dark
-                    ? const Color.fromRGBO(0, 0, 0, 0.5)
-                    : const Color.fromRGBO(255, 255, 255, 0.5),
-            // gradientColor![1]!.withOpacity(0.5),
+            // The panel's background is painted by the Material in
+            // [panelBuilder] instead: the queue rows are ListTiles, which need
+            // a Material ancestor to paint their selection and ink splashes on.
+            color: Colors.transparent,
+            // gradientColor![1]!.withValues(alpha: 0.5),
             // useBlurForNowPlaying
             // ? Theme.of(context).brightness == Brightness.dark
-            // Colors.black.withOpacity(0.2),
-            // : Colors.white.withOpacity(0.7)
+            // Colors.black.withValues(alpha: 0.2),
+            // : Colors.white.withValues(alpha: 0.7)
             // : Theme.of(context).brightness == Brightness.dark
             // ? Colors.black
             // : Colors.white,
@@ -2229,34 +2216,43 @@ class NameNControls extends StatelessWidget {
                     sigmaX: 8.0,
                     sigmaY: 8.0,
                   ),
-                  child: ShaderMask(
-                    shaderCallback: (rect) {
-                      return const LinearGradient(
-                        end: Alignment.topCenter,
-                        begin: Alignment.center,
-                        colors: [
-                          Colors.black,
-                          Colors.black,
-                          Colors.black,
-                          Colors.transparent,
-                          Colors.transparent,
-                        ],
-                      ).createShader(
-                        Rect.fromLTRB(
-                          0,
-                          0,
-                          rect.width,
-                          rect.height,
-                        ),
-                      );
-                    },
-                    blendMode: BlendMode.dstIn,
-                    child: NowPlayingStream(
-                      head: true,
-                      headHeight: nowplayingBoxHeight,
-                      audioHandler: audioHandler,
-                      scrollController: scrollController,
-                      panelController: panelController,
+                  child: Material(
+                    color: ['fullLight', 'fullMix'].contains(gradientType)
+                        ? Theme.of(context).brightness == Brightness.dark
+                            ? const Color.fromRGBO(0, 0, 0, 0.05)
+                            : const Color.fromRGBO(255, 255, 255, 0.05)
+                        : Theme.of(context).brightness == Brightness.dark
+                            ? const Color.fromRGBO(0, 0, 0, 0.5)
+                            : const Color.fromRGBO(255, 255, 255, 0.5),
+                    child: ShaderMask(
+                      shaderCallback: (rect) {
+                        return const LinearGradient(
+                          end: Alignment.topCenter,
+                          begin: Alignment.center,
+                          colors: [
+                            Colors.black,
+                            Colors.black,
+                            Colors.black,
+                            Colors.transparent,
+                            Colors.transparent,
+                          ],
+                        ).createShader(
+                          Rect.fromLTRB(
+                            0,
+                            0,
+                            rect.width,
+                            rect.height,
+                          ),
+                        );
+                      },
+                      blendMode: BlendMode.dstIn,
+                      child: NowPlayingStream(
+                        head: true,
+                        headHeight: nowplayingBoxHeight,
+                        audioHandler: audioHandler,
+                        scrollController: scrollController,
+                        panelController: panelController,
+                      ),
                     ),
                   ),
                 ),

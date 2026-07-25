@@ -25,9 +25,9 @@ import 'package:blackhole/CustomWidgets/textinput_dialog.dart';
 import 'package:blackhole/Helpers/audio_query.dart';
 import 'package:blackhole/Helpers/playlist.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
-import 'package:on_audio_query/on_audio_query.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
+import 'package:on_audio_query_forked/on_audio_query.dart';
 
 class AddToOffPlaylist {
   OfflineAudioQuery offlineAudioQuery = OfflineAudioQuery();
@@ -138,11 +138,11 @@ class AddToOffPlaylist {
 }
 
 class AddToPlaylist {
-  Box settingsBox = Hive.box('settings');
-  List playlistNames = Hive.box('settings')
+  Box settingsBox = AppDb.box('settings');
+  List playlistNames = AppDb.box('settings')
       .get('playlistNames', defaultValue: ['Favorite Songs']) as List;
   Map playlistDetails =
-      Hive.box('settings').get('playlistDetails', defaultValue: {}) as Map;
+      AppDb.box('settings').get('playlistDetails', defaultValue: {}) as Map;
 
   void addToPlaylist(BuildContext context, MediaItem? mediaItem) {
     showModalBottomSheet(
@@ -184,7 +184,7 @@ class AddToPlaylist {
                           value = 'Playlist ${playlistNames.length}';
                         }
                         if (playlistNames.contains(value) ||
-                            await Hive.boxExists(value)) {
+                            await AppDb.boxExists(value)) {
                           value = '$value (1)';
                         }
                         playlistNames.add(value);

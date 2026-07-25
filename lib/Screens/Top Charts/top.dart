@@ -29,8 +29,8 @@ import 'package:blackhole/Helpers/spotify_helper.dart';
 import 'package:blackhole/Screens/Search/search.dart';
 import 'package:blackhole/constants/countrycodes.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 List localSongs = [];
@@ -127,7 +127,7 @@ class _TopChartsState extends State<TopCharts>
             physics: const CustomPhysics(),
             children: [
               ValueListenableBuilder(
-                valueListenable: Hive.box('settings').listenable(),
+                valueListenable: AppDb.box('settings').listenable(),
                 builder: (BuildContext context, Box box, Widget? widget) {
                   return TopPage(
                     type: box.get('region', defaultValue: 'India').toString(),
@@ -173,7 +173,7 @@ Future<List> getChartDetails(String accessToken, String type) async {
 
 Future<void> scrapData(String type, {bool signIn = false}) async {
   final bool spotifySigned =
-      Hive.box('settings').get('spotifySigned', defaultValue: false) as bool;
+      AppDb.box('settings').get('spotifySigned', defaultValue: false) as bool;
 
   if (!spotifySigned && !signIn) {
     return;
@@ -187,26 +187,26 @@ Future<void> scrapData(String type, {bool signIn = false}) async {
       mode: LaunchMode.externalApplication,
     );
     final appLinks = AppLinks();
-    appLinks.allUriLinkStream.listen(
+    appLinks.uriLinkStream.listen(
       (uri) async {
         final link = uri.toString();
         if (link.contains('code=')) {
           final code = link.split('code=')[1];
-          Hive.box('settings').put('spotifyAppCode', code);
+          AppDb.box('settings').put('spotifyAppCode', code);
           final currentTime = DateTime.now().millisecondsSinceEpoch / 1000;
           final List<String> data =
               await SpotifyApi().getAccessToken(code: code);
           if (data.isNotEmpty) {
-            Hive.box('settings').put('spotifyAccessToken', data[0]);
-            Hive.box('settings').put('spotifyRefreshToken', data[1]);
-            Hive.box('settings').put('spotifySigned', true);
-            Hive.box('settings')
+            AppDb.box('settings').put('spotifyAccessToken', data[0]);
+            AppDb.box('settings').put('spotifyRefreshToken', data[1]);
+            AppDb.box('settings').put('spotifySigned', true);
+            AppDb.box('settings')
                 .put('spotifyTokenExpireAt', currentTime + int.parse(data[2]));
           }
 
           final temp = await getChartDetails(data[0], type);
           if (temp.isNotEmpty) {
-            Hive.box('cache').put('${type}_chart', temp);
+            AppDb.box('cache').put('${type}_chart', temp);
             if (type == 'Global') {
               globalSongs = temp;
             } else {
@@ -224,7 +224,7 @@ Future<void> scrapData(String type, {bool signIn = false}) async {
   } else {
     final temp = await getChartDetails(accessToken, type);
     if (temp.isNotEmpty) {
-      Hive.box('cache').put('${type}_chart', temp);
+      AppDb.box('cache').put('${type}_chart', temp);
       if (type == 'Global') {
         globalSongs = temp;
       } else {
@@ -255,10 +255,10 @@ class _TopPageState extends State<TopPage>
       localFetched = true;
     }
     if (type == 'Global') {
-      globalSongs = await Hive.box('cache')
+      globalSongs = await AppDb.box('cache')
           .get('${type}_chart', defaultValue: []) as List;
     } else {
-      localSongs = await Hive.box('cache')
+      localSongs = await AppDb.box('cache')
           .get('${type}_chart', defaultValue: []) as List;
     }
     setState(() {});
@@ -288,7 +288,7 @@ class _TopPageState extends State<TopPage>
         final List showList = isGlobal ? globalSongs : localSongs;
         return Column(
           children: [
-            if (!(Hive.box('settings').get('spotifySigned', defaultValue: false)
+            if (!(AppDb.box('settings').get('spotifySigned', defaultValue: false)
                 as bool))
               Expanded(
                 child: Center(

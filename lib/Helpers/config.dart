@@ -18,28 +18,28 @@
  */
 
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class MyTheme with ChangeNotifier {
   bool _isDark =
-      Hive.box('settings').get('darkMode', defaultValue: true) as bool;
+      AppDb.box('settings').get('darkMode', defaultValue: true) as bool;
 
   bool _useSystemTheme =
-      Hive.box('settings').get('useSystemTheme', defaultValue: false) as bool;
+      AppDb.box('settings').get('useSystemTheme', defaultValue: false) as bool;
 
   String accentColor =
-      Hive.box('settings').get('themeColor', defaultValue: 'Teal') as String;
+      AppDb.box('settings').get('themeColor', defaultValue: 'Teal') as String;
   String canvasColor =
-      Hive.box('settings').get('canvasColor', defaultValue: 'Grey') as String;
+      AppDb.box('settings').get('canvasColor', defaultValue: 'Grey') as String;
   String cardColor =
-      Hive.box('settings').get('cardColor', defaultValue: 'Grey900') as String;
+      AppDb.box('settings').get('cardColor', defaultValue: 'Grey900') as String;
 
-  int backGrad = Hive.box('settings').get('backGrad', defaultValue: 2) as int;
-  int cardGrad = Hive.box('settings').get('cardGrad', defaultValue: 4) as int;
+  int backGrad = AppDb.box('settings').get('backGrad', defaultValue: 2) as int;
+  int cardGrad = AppDb.box('settings').get('cardGrad', defaultValue: 4) as int;
   int bottomGrad =
-      Hive.box('settings').get('bottomGrad', defaultValue: 3) as int;
+      AppDb.box('settings').get('bottomGrad', defaultValue: 3) as int;
 
-  int colorHue = Hive.box('settings').get('colorHue', defaultValue: 400) as int;
+  int colorHue = AppDb.box('settings').get('colorHue', defaultValue: 400) as int;
   List<Color?>? playGradientColor;
 
   List<List<Color>> get backOpt => _backOpt;
@@ -109,32 +109,32 @@ class MyTheme with ChangeNotifier {
 
   final List<List<Color>> _transOpt = [
     [
-      Colors.grey[850]!.withOpacity(0.8),
-      Colors.grey[900]!.withOpacity(0.9),
-      Colors.black.withOpacity(1),
+      Colors.grey[850]!.withValues(alpha: 0.8),
+      Colors.grey[900]!.withValues(alpha: 0.9),
+      Colors.black.withValues(alpha: 1),
     ],
     [
-      Colors.grey[900]!.withOpacity(0.8),
-      Colors.grey[900]!.withOpacity(0.9),
-      Colors.black.withOpacity(1),
+      Colors.grey[900]!.withValues(alpha: 0.8),
+      Colors.grey[900]!.withValues(alpha: 0.9),
+      Colors.black.withValues(alpha: 1),
     ],
     [
-      Colors.grey[900]!.withOpacity(0.9),
-      Colors.black.withOpacity(1),
+      Colors.grey[900]!.withValues(alpha: 0.9),
+      Colors.black.withValues(alpha: 1),
     ],
     [
-      Colors.grey[900]!.withOpacity(0.9),
-      Colors.black.withOpacity(0.9),
-      Colors.black.withOpacity(1),
+      Colors.grey[900]!.withValues(alpha: 0.9),
+      Colors.black.withValues(alpha: 0.9),
+      Colors.black.withValues(alpha: 1),
     ],
     [
-      Colors.black.withOpacity(0.9),
-      Colors.black.withOpacity(1),
+      Colors.black.withValues(alpha: 0.9),
+      Colors.black.withValues(alpha: 1),
     ]
   ];
 
   void refresh() {
-    final Box settingsBox = Hive.box('settings');
+    final Box settingsBox = AppDb.box('settings');
     _isDark = settingsBox.get('darkMode', defaultValue: true) as bool;
 
     _useSystemTheme =
@@ -160,15 +160,15 @@ class MyTheme with ChangeNotifier {
     if (useSystemTheme != null) {
       _useSystemTheme = useSystemTheme;
     }
-    Hive.box('settings').put('darkMode', _isDark);
-    Hive.box('settings').put('useSystemTheme', _useSystemTheme);
+    AppDb.box('settings').put('darkMode', _isDark);
+    AppDb.box('settings').put('useSystemTheme', _useSystemTheme);
     if (notify) notifyListeners();
   }
 
   void switchColor(String color, int hue, {bool notify = true}) {
-    Hive.box('settings').put('themeColor', color);
+    AppDb.box('settings').put('themeColor', color);
     accentColor = color;
-    Hive.box('settings').put('colorHue', hue);
+    AppDb.box('settings').put('colorHue', hue);
     colorHue = hue;
     if (notify) notifyListeners();
   }
@@ -234,7 +234,7 @@ class MyTheme with ChangeNotifier {
   }
 
   void switchCanvasColor(String color, {bool notify = true}) {
-    Hive.box('settings').put('canvasColor', color);
+    AppDb.box('settings').put('canvasColor', color);
     canvasColor = color;
     if (notify) notifyListeners();
   }
@@ -248,7 +248,7 @@ class MyTheme with ChangeNotifier {
   }
 
   void switchCardColor(String color, {bool notify = true}) {
-    Hive.box('settings').put('cardColor', color);
+    AppDb.box('settings').put('cardColor', color);
     cardColor = color;
     if (notify) notifyListeners();
   }
@@ -317,8 +317,8 @@ class MyTheme with ChangeNotifier {
 
   void saveTheme(String themeName) {
     final userThemes =
-        Hive.box('settings').get('userThemes', defaultValue: {}) as Map;
-    Hive.box('settings').put(
+        AppDb.box('settings').get('userThemes', defaultValue: {}) as Map;
+    AppDb.box('settings').put(
       'userThemes',
       {
         ...userThemes,
@@ -339,21 +339,21 @@ class MyTheme with ChangeNotifier {
 
   void deleteTheme(String themeName) {
     final userThemes =
-        Hive.box('settings').get('userThemes', defaultValue: {}) as Map;
+        AppDb.box('settings').get('userThemes', defaultValue: {}) as Map;
     userThemes.remove(themeName);
 
-    Hive.box('settings').put('userThemes', {...userThemes});
+    AppDb.box('settings').put('userThemes', {...userThemes});
   }
 
   Map getThemes() {
-    return Hive.box('settings').get('userThemes', defaultValue: {}) as Map;
+    return AppDb.box('settings').get('userThemes', defaultValue: {}) as Map;
   }
 
   void setInitialTheme(String themeName) {
-    Hive.box('settings').put('theme', themeName);
+    AppDb.box('settings').put('theme', themeName);
   }
 
   String getInitialTheme() {
-    return Hive.box('settings').get('theme') as String;
+    return AppDb.box('settings').get('theme') as String;
   }
 }

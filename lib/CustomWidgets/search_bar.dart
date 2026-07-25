@@ -21,7 +21,7 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class SearchBar extends StatefulWidget {
   final Widget body;
@@ -184,7 +184,7 @@ class _SearchBarState extends State<SearchBar> {
                       if (submittedQuery.trim() != '') {
                         query = submittedQuery.trim();
                         widget.onSubmitted(submittedQuery);
-                        List searchQueries = Hive.box('settings')
+                        List searchQueries = AppDb.box('settings')
                             .get('search', defaultValue: []) as List;
                         if (searchQueries.contains(query)) {
                           searchQueries.remove(query);
@@ -193,7 +193,7 @@ class _SearchBarState extends State<SearchBar> {
                         if (searchQueries.length > 10) {
                           searchQueries = searchQueries.sublist(0, 10);
                         }
-                        Hive.box('settings').put('search', searchQueries);
+                        AppDb.box('settings').put('search', searchQueries);
                       }
                     },
                   ),
@@ -258,7 +258,7 @@ class _SearchBarState extends State<SearchBar> {
                                         FocusManager.instance.primaryFocus
                                             ?.unfocus();
                                         List searchQueries =
-                                            Hive.box('settings').get(
+                                            AppDb.box('settings').get(
                                           'search',
                                           defaultValue: [],
                                         ) as List;
@@ -283,7 +283,7 @@ class _SearchBarState extends State<SearchBar> {
                                           searchQueries =
                                               searchQueries.sublist(0, 10);
                                         }
-                                        Hive.box('settings')
+                                        AppDb.box('settings')
                                             .put('search', searchQueries);
                                       },
                                     );

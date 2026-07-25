@@ -29,7 +29,7 @@ import 'package:blackhole/Services/player_service.dart';
 import 'package:blackhole/Services/youtube_services.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
-import 'package:on_audio_query/on_audio_query.dart';
+import 'package:on_audio_query_forked/on_audio_query.dart';
 
 // ignore: avoid_classes_with_only_static_members
 class HandleRoute {

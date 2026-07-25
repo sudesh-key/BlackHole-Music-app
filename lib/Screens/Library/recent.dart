@@ -23,8 +23,8 @@ import 'package:blackhole/CustomWidgets/image_card.dart';
 import 'package:blackhole/CustomWidgets/like_button.dart';
 import 'package:blackhole/Services/player_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class RecentlyPlayed extends StatefulWidget {
   @override
@@ -36,7 +36,7 @@ class _RecentlyPlayedState extends State<RecentlyPlayed> {
   bool added = false;
 
   Future<void> getSongs() async {
-    _songs = Hive.box('cache').get('recentSongs', defaultValue: []) as List;
+    _songs = AppDb.box('cache').get('recentSongs', defaultValue: []) as List;
     added = true;
     setState(() {});
   }
@@ -60,7 +60,7 @@ class _RecentlyPlayedState extends State<RecentlyPlayed> {
           actions: [
             IconButton(
               onPressed: () {
-                Hive.box('cache').put('recentSongs', []);
+                AppDb.box('cache').put('recentSongs', []);
                 setState(() {
                   _songs = [];
                 });
@@ -110,7 +110,7 @@ class _RecentlyPlayedState extends State<RecentlyPlayed> {
                           onDismissed: (direction) {
                             _songs.removeAt(index);
                             setState(() {});
-                            Hive.box('cache').put('recentSongs', _songs);
+                            AppDb.box('cache').put('recentSongs', _songs);
                           },
                           child: ListTile(
                             leading: imageCard(

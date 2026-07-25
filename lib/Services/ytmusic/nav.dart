@@ -25,6 +25,10 @@ class NavClass {
   static const tab1Content = ['tabs', 1, 'tabRenderer', 'content'];
   static const singleColumn = ['contents', 'singleColumnBrowseResultsRenderer'];
   static const singleColumnTab = [...singleColumn, ...tabContent];
+  static const twoColumn = ['contents', 'twoColumnBrowseResultsRenderer'];
+  static const twoColumnTab = [...twoColumn, ...tabContent];
+  static const twoColumnSecondary = [...twoColumn, 'secondaryContents'];
+  static const responsiveHeader = ['musicResponsiveHeaderRenderer'];
   static const sectionList = ['sectionListRenderer', 'contents'];
   static const sectionListItem = ['sectionListRenderer', ...content];
   static const itemSection = ['itemSectionRenderer', ...content];
@@ -159,6 +163,7 @@ class NavClass {
   static const mRLIFCR = 'musicResponsiveListItemFlexColumnRenderer';
   static const mrlirPlaylistId = [mRLIR, 'playlistItemData', 'videoId'];
   static const mrlirBrowseId = [mRLIR, ...navigationBrowseId];
+  static const mrlirPageType = [mRLIR, ...navigationBrowse, ...pageType];
   static const tasteProfileItems = [
     'contents',
     'tastebuilderRenderer',

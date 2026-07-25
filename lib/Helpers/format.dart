@@ -24,7 +24,7 @@ import 'package:blackhole/APIs/api.dart';
 import 'package:blackhole/Helpers/extensions.dart';
 import 'package:blackhole/Helpers/image_resolution_modifier.dart';
 import 'package:dart_des/dart_des.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
 
 // ignore: avoid_classes_with_only_static_members
@@ -75,7 +75,7 @@ class FormatResponse {
   }
 
   static Future<Map> formatSingleSongResponse(Map response) async {
-    // Map cachedSong = Hive.box('cache').get(response['id']);
+    // Map cachedSong = AppDb.box('cache').get(response['id']);
     // if (cachedSong != null) {
     //   return cachedSong;
     // }
@@ -145,7 +145,7 @@ class FormatResponse {
         'perma_url': response['perma_url'],
         'url': decode(response['more_info']['encrypted_media_url'].toString()),
       };
-      // Hive.box('cache').put(response['id'].toString(), info);
+      // AppDb.box('cache').put(response['id'].toString(), info);
     } catch (e) {
       Logger.root.severe('Error inside FormatSingleSongResponse: $e');
       return {'Error': e};
@@ -285,7 +285,7 @@ class FormatResponse {
             ? 0
             : response['more_info']['song_pids'].toString().split(', ').length,
         'songs_pids': response['more_info']['song_pids'].toString().split(', '),
-        'perma_url': response['url'].toString(),
+        'perma_url': (response['perma_url'] ?? response['url']).toString(),
       };
     } catch (e) {
       Logger.root.severe('Error inside formatSingleAlbumResponse: $e');
@@ -315,7 +315,7 @@ class FormatResponse {
             ? response['music']
             : response['more_info']['music'],
         'image': getImageUrl(response['image'].toString()),
-        'perma_url': response['url'].toString(),
+        'perma_url': (response['perma_url'] ?? response['url']).toString(),
       };
     } catch (e) {
       Logger.root.severe('Error inside formatSinglePlaylistResponse: $e');
@@ -345,7 +345,7 @@ class FormatResponse {
             : response['title'].toString().unescape(),
         // .split('(')
         // .first
-        'perma_url': response['url'].toString(),
+        'perma_url': (response['perma_url'] ?? response['url']).toString(),
         'artist': response['title'].toString().unescape(),
         'album_artist': response['more_info'] == null
             ? response['music']
@@ -513,6 +513,9 @@ class FormatResponse {
         data[promoList[i]] =
             await formatSongsInList(data[promoList[i]] as List);
       }
+      // JioSaavn drops shelves from the launch data over time (`tag_mixes` is
+      // gone), so only advertise the ones that actually came back — the home
+      // screen renders a section per entry and would leave a blank otherwise.
       data['collections'] = [
         'new_trending',
         'charts',
@@ -523,7 +526,12 @@ class FormatResponse {
         'city_mod',
         'artist_recos',
         ...promoList,
-      ];
+      ]
+          .where(
+            (dynamic key) =>
+                data[key] is List && (data[key] as List).isNotEmpty,
+          )
+          .toList();
       data['collections_temp'] = promoListTemp;
     } catch (e) {
       Logger.root.severe('Error inside formatHomePageData: $e');
@@ -533,12 +541,12 @@ class FormatResponse {
 
   static Future<Map> formatPromoLists(Map data) async {
     try {
-      final List promoList = data['collections_temp'] as List;
+      final List promoList = data['collections_temp'] as List? ?? [];
       for (int i = 0; i < promoList.length; i++) {
         data[promoList[i]] =
-            await formatSongsInList(data[promoList[i]] as List);
+            await formatSongsInList(data[promoList[i]] as List? ?? []);
       }
-      data['collections'].addAll(promoList);
+      (data['collections'] as List? ?? []).addAll(promoList);
       data['collections_temp'] = [];
     } catch (e) {
       Logger.root.severe('Error inside formatPromoLists: $e');
@@ -552,12 +560,12 @@ class FormatResponse {
         final Map item = list[i] as Map;
         if (item['type'] == 'song') {
           if (item['mini_obj'] as bool? ?? false) {
-            Map cachedDetails = Hive.box('cache')
+            Map cachedDetails = AppDb.box('cache')
                 .get(item['id'].toString(), defaultValue: {}) as Map;
             if (cachedDetails.isEmpty) {
               cachedDetails =
                   await SaavnAPI().fetchSongDetails(item['id'].toString());
-              Hive.box('cache')
+              AppDb.box('cache')
                   .put(cachedDetails['id'].toString(), cachedDetails);
             }
             list[i] = cachedDetails;

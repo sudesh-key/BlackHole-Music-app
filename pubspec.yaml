@@ -4,72 +4,87 @@ description: An Open Source Music Player App.
 # Prevent accidental publishing to pub.dev.
 publish_to: "none"
 
-version: 1.15.10+41
+version: 2.0.0+42
 
 environment:
-  sdk: ">=3.1.0 <4.0.0"
-  flutter: ">=3.3.0"
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.32.0"
 
 dependencies:
-  app_links: ^3.5.0
-  audio_service: ^0.18.12
-  audiotagger:
-    git:
-      url: https://github.com/Sangwan5688/Audiotagger
-      ref: 90f2db5
-  # bitsdojo_window: ^0.1.1+1 #For Desktops
-  cached_network_image: ^3.3.0
-  carousel_slider: ^4.2.1
-  connectivity_plus: ^5.0.2
-  cupertino_icons: ^1.0.6
+  # Floor lowered to 7.0.0: app_links 7.1.x requires Dart >=3.12
+  # (Flutter 3.44+). Same uriLinkStream API; pub picks the newest
+  # release your SDK supports automatically.
+  app_links: ^7.0.0
+  audio_service: ^0.18.19
+  cached_network_image: ^3.4.1
+  carousel_slider: ^5.1.2
+  connectivity_plus: ^7.1.1
+  cupertino_icons: ^1.0.8
   dart_des: ^1.0.2
-  device_info_plus: ^9.1.1
-  # ffmpeg_kit_flutter_audio: ^6.0.3
-  file_picker: ^6.1.1
+  # Capped at 12.x: device_info_plus 13.x requires win32 ^6 (blocked by
+  # file_picker, see note on share_plus below) and Flutter >=3.41.
+  device_info_plus: ^12.1.0
+  file_picker: ^11.0.2
   flip_card: ^0.7.0
   flutter:
     sdk: flutter
-  flutter_archive: ^6.0.0
-  flutter_displaymode: ^0.6.0
-  # flutter_downloader: ^1.7.1
+  flutter_archive: ^6.0.4
+  flutter_displaymode: ^0.7.0
   flutter_localizations:
     sdk: flutter
-  flutter_lyric: ^2.0.4+6
-  get_it: ^7.6.4
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-  # home_widget: ^0.3.0
+  flutter_lyric: ^3.0.7
+  get_it: ^9.2.1
+  # Primary local database (replaces Hive).
+  drift: ^2.30.0
+  drift_flutter: ^0.3.0
+  # Kept ONLY to read old .hive files during the one-time Drift migration
+  # (lib/Services/db/hive_migration.dart). Safe to remove later.
+  hive_ce: ^2.19.3
   html_unescape: ^2.0.0
-  just_audio: ^0.9.36
-  # Discontinued, Use just_audio_windows instead.
-  # just_audio_libwinmedia: ^0.0.4 # For windows and linux.
-  logging: ^1.2.0
-  marquee: ^2.2.3
-  material_design_icons_flutter: 5.0.5955-rc.1
-  metadata_god: ^0.5.2+1
-  on_audio_query: ^2.9.0
-  package_info_plus: ^5.0.1
-  palette_generator: ^0.3.3+3
-  path_provider: ^2.1.1
-  permission_handler: ^11.1.0
-  persistent_bottom_nav_bar:
-    git:
-      url: https://github.com/Sangwan5688/PersistentBottomNavBar
-      ref: ecdadb0
-  receive_sharing_intent: ^1.4.5
-  share_plus: ^7.2.1
-  sizer: ^2.0.15
+  http: ^1.5.0
+  just_audio: ^0.10.5
+  logging: ^1.3.0
+  marquee: ^2.3.0
+  # Local subset of Material Design Icons; the pub package is unmaintained and
+  # no longer compiles now that `IconData` is a final class.
+  mdi_icons:
+    path: packages/mdi_icons
+  # Replaces the discontinued `audiotagger` git package for tag read/write.
+  metadata_god: ^1.1.0
+  # AGP 8 compatible fork of the unmaintained on_audio_query.
+  on_audio_query_forked: ^2.9.1
+  # Capped at 9.x: package_info_plus 10.x requires win32 ^6 (same win32
+  # conflict as share_plus/device_info_plus).
+  package_info_plus: ^9.0.0
+  palette_generator: ^0.3.3+7
+  path_provider: ^2.1.5
+  permission_handler: ^12.0.3
+  # Pinned to 1.8.1: 1.9.0 is SPM-only and its objective_c.framework fails
+  # code-signature verification on device install (0xe8008014).
+  receive_sharing_intent: 1.8.1
+  # Capped at 12.x: every share_plus 13.x release requires win32 ^6 while
+  # file_picker 11.x (latest stable) still pins win32 ^5. share_plus 12
+  # already has the SharePlus.instance/ShareParams API we use.
+  # Bump to ^13 once file_picker 12 (win32 ^6) leaves beta.
+  share_plus: ^12.0.0
+  sizer: ^3.1.3
   sliding_up_panel: ^2.0.0+1
-  url_launcher: ^6.2.2
-  uuid: ^3.0.7
-  # workmanager: ^0.5.1
-  youtube_explode_dart: ^2.0.4
+  url_launcher: ^6.3.2
+  uuid: ^4.5.3
+  youtube_explode_dart: ^3.1.0
+
+# metadata_god 1.1.0 was generated with flutter_rust_bridge 2.11.1; the
+# runtime must match exactly or MetadataGod.initialize() throws at startup.
+dependency_overrides:
+  flutter_rust_bridge: 2.11.1
 
 dev_dependencies:
+  build_runner: ^2.5.4
+  drift_dev: ^2.30.0
+  flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
-  lint: ^2.1.2
-  msix: ^3.16.4
+  msix: ^3.17.0
 
 flutter:
   uses-material-design: true

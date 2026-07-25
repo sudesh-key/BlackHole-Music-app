@@ -5,9 +5,9 @@ import 'package:blackhole/CustomWidgets/snackbar.dart';
 import 'package:blackhole/CustomWidgets/textinput_dialog.dart';
 import 'package:blackhole/Helpers/config.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class ThemePage extends StatefulWidget {
   final Function? callback;
@@ -18,19 +18,19 @@ class ThemePage extends StatefulWidget {
 }
 
 class _ThemePageState extends State<ThemePage> {
-  final Box settingsBox = Hive.box('settings');
+  final Box settingsBox = AppDb.box('settings');
   final MyTheme currentTheme = GetIt.I<MyTheme>();
   String canvasColor =
-      Hive.box('settings').get('canvasColor', defaultValue: 'Grey') as String;
+      AppDb.box('settings').get('canvasColor', defaultValue: 'Grey') as String;
   String cardColor =
-      Hive.box('settings').get('cardColor', defaultValue: 'Grey900') as String;
+      AppDb.box('settings').get('cardColor', defaultValue: 'Grey900') as String;
   String theme =
-      Hive.box('settings').get('theme', defaultValue: 'Default') as String;
+      AppDb.box('settings').get('theme', defaultValue: 'Default') as String;
   Map userThemes =
-      Hive.box('settings').get('userThemes', defaultValue: {}) as Map;
+      AppDb.box('settings').get('userThemes', defaultValue: {}) as Map;
   String themeColor =
-      Hive.box('settings').get('themeColor', defaultValue: 'Teal') as String;
-  int colorHue = Hive.box('settings').get('colorHue', defaultValue: 400) as int;
+      AppDb.box('settings').get('themeColor', defaultValue: 'Teal') as String;
+  int colorHue = AppDb.box('settings').get('colorHue', defaultValue: 400) as int;
 
   @override
   Widget build(BuildContext context) {
@@ -691,7 +691,7 @@ class _ThemePageState extends State<ThemePage> {
                   useSystemTheme: false,
                   isDark: true,
                 );
-                Hive.box('settings').put('darkMode', true);
+                AppDb.box('settings').put('darkMode', true);
 
                 settingsBox.put('backGrad', 4);
                 currentTheme.backGrad = 4;

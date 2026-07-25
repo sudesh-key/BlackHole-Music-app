@@ -1,4 +1,12 @@
-include: package:lint/analysis_options.yaml
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    # Generated files
+    - lib/l10n/**
+    - lib/**/*.g.dart
+  errors:
+    deprecated_member_use: warning
 
 linter:
   rules:
@@ -6,3 +14,7 @@ linter:
     prefer_single_quotes: true
     depend_on_referenced_packages: false
     use_build_context_synchronously: false
+    # Legacy (2021-era) codebase style — intentionally not enforced:
+    use_key_in_widget_constructors: false
+    library_private_types_in_public_api: false
+    unnecessary_underscores: false

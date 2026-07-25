@@ -280,7 +280,23 @@ class YtMusicService {
       final List finalResults =
           NavClass.nav(results, ['sectionListRenderer', 'contents']) as List? ??
               [];
+      // Results now arrive as one `itemSectionRenderer` per row without shelf
+      // titles, so rows are grouped by the type parsed from their own subtitle.
+      final Map<String, List> groupedItems = {};
       for (final sectionItem in finalResults) {
+        final List? flatItems = NavClass.nav(
+          sectionItem,
+          ['itemSectionRenderer', 'contents'],
+        ) as List?;
+        if (flatItems != null) {
+          for (final childItem in flatItems) {
+            final res = parseInfoFromSubtitle(childItem as Map);
+            if (res != null) {
+              groupedItems.putIfAbsent('${res['type']}s', () => []).add(res);
+            }
+          }
+          continue;
+        }
         final bool containsHeader =
             (sectionItem as Map).containsKey('musicCardShelfRenderer');
         final sectionSearchResults = [];
@@ -339,6 +355,9 @@ class YtMusicService {
           });
         }
       }
+      groupedItems.forEach((String title, List items) {
+        searchResults.add({'title': title, 'items': items});
+      });
       return searchResults;
     } catch (e) {
       Logger.root.severe('Error in yt search', e);
@@ -416,6 +435,68 @@ class YtMusicService {
     }
   }
 
+  /// Playlist and album pages moved to the two-column layout, where the detail
+  /// header sits in the first tab section instead of `header`. Falls back to
+  /// the single-column `musicDetailHeaderRenderer` for older rollouts.
+  Map<String, dynamic> browseHeaderDetails(Map response) {
+    final Map? header = (NavClass.nav(response, [
+              ...NavClass.twoColumnTab,
+              ...NavClass.sectionListItem,
+              ...NavClass.responsiveHeader,
+            ]) ??
+            NavClass.nav(response, NavClass.headerDetail)) as Map?;
+    if (header == null) return {};
+    return {
+      'name': NavClass.nav(header, NavClass.titleText) as String?,
+      'subtitle': NavClass.joinRunTexts(
+        NavClass.nav(header, NavClass.subtitleRuns) as List?,
+      ),
+      'description': NavClass.joinRunTexts(
+        (NavClass.nav(header, [
+              'description',
+              ...NavClass.descriptionShelf,
+              'description',
+              'runs',
+            ]) ??
+            NavClass.nav(header, ['description', 'runs'])) as List?,
+      ),
+      'images': NavClass.runUrls(
+        (NavClass.nav(header, NavClass.thumbnails) ??
+            NavClass.nav(header, NavClass.thumbnailCropped)) as List?,
+      ),
+    };
+  }
+
+  /// Track list of a playlist or album page: `musicPlaylistShelfRenderer` for
+  /// playlists, `musicShelfRenderer` for albums, under `secondaryContents` in
+  /// the two-column layout and under the tab in the single-column one.
+  List browseSongShelf(Map response) {
+    final Map? shelf = (NavClass.nav(response, [
+              ...NavClass.twoColumnSecondary,
+              ...NavClass.sectionListItem,
+            ]) ??
+            NavClass.nav(response, [
+              ...NavClass.singleColumnTab,
+              ...NavClass.sectionListItem,
+            ])) as Map?;
+    if (shelf == null || shelf.isEmpty) return [];
+    return (shelf.values.first['contents'] as List?) ?? [];
+  }
+
+  String? _typeFromPageType(String? pageType) {
+    switch (pageType) {
+      case 'MUSIC_PAGE_TYPE_PLAYLIST':
+        return 'Playlist';
+      case 'MUSIC_PAGE_TYPE_ALBUM':
+        return 'Album';
+      case 'MUSIC_PAGE_TYPE_ARTIST':
+      case 'MUSIC_PAGE_TYPE_USER_CHANNEL':
+        return 'Artist';
+      default:
+        return null;
+    }
+  }
+
   Map? parseInfoFromSubtitle(
     Map childItem, {
     List? idNavPath,
@@ -458,8 +539,15 @@ class YtMusicService {
       'artist',
       'profile',
     ].contains(type.toLowerCase())) {
-      type = 'Song';
-      subtitleList.insert(0, 'Song');
+      // A filtered search drops the redundant "Playlist • " prefix from the
+      // subtitle, which used to leave the row typed as a song: the browse id
+      // was then looked up on the song path, came back null, and the tile
+      // could not be opened. The row's own page type is authoritative.
+      type = _typeFromPageType(
+            NavClass.nav(childItem, NavClass.mrlirPageType)?.toString(),
+          ) ??
+          'Song';
+      subtitleList.insert(0, type);
     }
 
     final List idNav = (type == 'Song' || type == 'Video')
@@ -622,56 +710,12 @@ class YtMusicService {
       body['browseId'] = browseId;
       final Map response =
           await sendRequest(endpoints['browse']!, body, headers);
-      final String? heading = NavClass.nav(response, [
-        'header',
-        'musicDetailHeaderRenderer',
-        'title',
-        'runs',
-        0,
-        'text',
-      ]) as String?;
-      final String subtitle = (NavClass.nav(response, [
-                'header',
-                'musicDetailHeaderRenderer',
-                'subtitle',
-                'runs',
-              ]) as List? ??
-              [])
-          .map((e) => e['text'])
-          .toList()
-          .join();
-      final String? description = NavClass.nav(response, [
-        'header',
-        'musicDetailHeaderRenderer',
-        'description',
-        'runs',
-        0,
-        'text',
-      ]) as String?;
-      final List images = (NavClass.nav(response, [
-        'header',
-        'musicDetailHeaderRenderer',
-        'thumbnail',
-        'croppedSquareThumbnailRenderer',
-        'thumbnail',
-        'thumbnails',
-      ]) as List)
-          .map((e) => e['url'])
-          .toList();
-      final List finalResults = NavClass.nav(response, [
-            'contents',
-            'singleColumnBrowseResultsRenderer',
-            'tabs',
-            0,
-            'tabRenderer',
-            'content',
-            'sectionListRenderer',
-            'contents',
-            0,
-            'musicPlaylistShelfRenderer',
-            'contents',
-          ]) as List? ??
-          [];
+      final Map<String, dynamic> headerDetails = browseHeaderDetails(response);
+      final String? heading = headerDetails['name'] as String?;
+      final String subtitle = headerDetails['subtitle'] as String? ?? '';
+      final String? description = headerDetails['description'] as String?;
+      final List images = headerDetails['images'] as List? ?? [];
+      final List finalResults = browseSongShelf(response);
       final List<Map> songResults = [];
       for (final item in finalResults) {
         final String id = NavClass.nav(item, [
@@ -780,48 +824,25 @@ class YtMusicService {
       body['browseId'] = albumId;
       final Map response =
           await sendRequest(endpoints['browse']!, body, headers);
-      final String? heading = NavClass.nav(
-        response,
-        [...NavClass.headerDetail, ...NavClass.titleText],
-      ) as String?;
-      final String subtitle = NavClass.joinRunTexts(
-        NavClass.nav(response, [
-              ...NavClass.headerDetail,
-              ...NavClass.subtitleRuns,
-            ]) as List? ??
-            [],
-      );
-      final String description = NavClass.joinRunTexts(
-        NavClass.nav(response, [
-              ...NavClass.headerDetail,
-              ...NavClass.secondSubtitleRuns,
-            ]) as List? ??
-            [],
-      );
-      final List images = NavClass.runUrls(
-        NavClass.nav(response, [
-              ...NavClass.headerDetail,
-              ...NavClass.thumbnailCropped,
-            ]) as List? ??
-            [],
-      );
-      final List finalResults = NavClass.nav(response, [
-            ...NavClass.singleColumnTab,
-            ...NavClass.sectionListItem,
-            ...NavClass.musicShelf,
-            'contents',
-          ]) as List? ??
-          [];
+      final Map<String, dynamic> headerDetails = browseHeaderDetails(response);
+      final String? heading = headerDetails['name'] as String?;
+      final String subtitle = headerDetails['subtitle'] as String? ?? '';
+      final String description = headerDetails['description'] as String? ?? '';
+      final List images = headerDetails['images'] as List? ?? [];
+      final List finalResults = browseSongShelf(response);
       final List<Map> songResults = [];
       for (final item in finalResults) {
         final String id =
             NavClass.nav(item, NavClass.mrlirPlaylistId).toString();
-        final String image = NavClass.nav(item, [
-          NavClass.mRLIR,
-          ...NavClass.thumbnails,
-          0,
-          'url',
-        ]).toString();
+        // Album rows carry no artwork of their own; they share the album's.
+        final String image = (NavClass.nav(item, [
+                  NavClass.mRLIR,
+                  ...NavClass.thumbnails,
+                  0,
+                  'url',
+                ]) ??
+                (images.isEmpty ? '' : images.first))
+            .toString();
         final String title = NavClass.nav(item, [
           NavClass.mRLIR,
           'flexColumns',

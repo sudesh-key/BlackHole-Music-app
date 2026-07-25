@@ -20,6 +20,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:blackhole/constants/app_credentials.dart';
 import 'package:http/http.dart';
 import 'package:logging/logging.dart';
 
@@ -31,10 +32,11 @@ class SpotifyApi {
     'playlist-read-collaborative',
   ];
 
-  /// You can signup for spotify developer account and get your own clientID and clientSecret incase you don't want to use these
-  final String clientID = '08de4eaf71904d1b95254fab3015d711';
-  final String clientSecret = '622b4fbad33947c59b95a6ae607de11d';
-  final String redirectUrl = 'blackhole://spotify/auth';
+  /// Sign up for a Spotify developer account and supply your own credentials
+  /// in lib/constants/app_credentials.dart (or via --dart-define).
+  final String clientID = AppCredentials.spotifyClientId;
+  final String clientSecret = AppCredentials.spotifyClientSecret;
+  final String redirectUrl = AppCredentials.spotifyRedirectUrl;
   final String spotifyApiUrl = 'https://accounts.spotify.com/api';
   final String spotifyApiBaseUrl = 'https://api.spotify.com/v1';
   final String spotifyUserPlaylistEndpoint = '/me/playlists';

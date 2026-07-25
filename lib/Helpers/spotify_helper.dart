@@ -19,17 +19,17 @@
 
 import 'package:app_links/app_links.dart';
 import 'package:blackhole/APIs/spotify_api.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 Future<String?> retriveAccessToken() async {
-  String? accessToken = Hive.box('settings')
+  String? accessToken = AppDb.box('settings')
       .get('spotifyAccessToken', defaultValue: null)
       ?.toString();
-  String? refreshToken = Hive.box('settings')
+  String? refreshToken = AppDb.box('settings')
       .get('spotifyRefreshToken', defaultValue: null)
       ?.toString();
-  final double expiredAt = Hive.box('settings')
+  final double expiredAt = AppDb.box('settings')
       .get('spotifyTokenExpireAt', defaultValue: 0.0) as double;
 
   if (accessToken == null || refreshToken == null) {
@@ -40,14 +40,14 @@ Future<String?> retriveAccessToken() async {
       final List<String> data =
           await SpotifyApi().getAccessToken(refreshToken: refreshToken);
       if (data.isNotEmpty) {
-        Hive.box('settings').put('spotifySigned', true);
+        AppDb.box('settings').put('spotifySigned', true);
         accessToken = data[0];
-        Hive.box('settings').put('spotifyAccessToken', data[0]);
+        AppDb.box('settings').put('spotifyAccessToken', data[0]);
         if (data[1] != 'null') {
           refreshToken = data[1];
-          Hive.box('settings').put('spotifyRefreshToken', data[1]);
+          AppDb.box('settings').put('spotifyRefreshToken', data[1]);
         }
-        Hive.box('settings')
+        AppDb.box('settings')
             .put('spotifyTokenExpireAt', currentTime + double.parse(data[2]));
       }
     }
@@ -71,19 +71,19 @@ Future<void> callSpotifyFunction({
       mode: LaunchMode.externalApplication,
     );
     final appLinks = AppLinks();
-    appLinks.allUriLinkStream.listen(
+    appLinks.uriLinkStream.listen(
       (uri) async {
         final link = uri.toString();
         if (link.contains('code=')) {
           final code = link.split('code=')[1];
-          Hive.box('settings').put('spotifyAppCode', code);
+          AppDb.box('settings').put('spotifyAppCode', code);
           final currentTime = DateTime.now().millisecondsSinceEpoch / 1000;
           final List<String> data =
               await SpotifyApi().getAccessToken(code: code);
           if (data.isNotEmpty) {
-            Hive.box('settings').put('spotifyAccessToken', data[0]);
-            Hive.box('settings').put('spotifyRefreshToken', data[1]);
-            Hive.box('settings').put(
+            AppDb.box('settings').put('spotifyAccessToken', data[0]);
+            AppDb.box('settings').put('spotifyRefreshToken', data[1]);
+            AppDb.box('settings').put(
               'spotifyTokenExpireAt',
               currentTime + int.parse(data[2]),
             );

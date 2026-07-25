@@ -25,9 +25,9 @@ import 'package:blackhole/Screens/Player/audioplayer.dart';
 import 'package:blackhole/Services/youtube_services.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:get_it/get_it.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
-import 'package:on_audio_query/on_audio_query.dart';
+import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
 
 // ignore: avoid_classes_with_only_static_members
@@ -186,14 +186,14 @@ class PlayerInvoke {
 
   static Future<void> refreshYtLink(Map playItem) async {
     // final bool cacheSong =
-    // Hive.box('settings').get('cacheSong', defaultValue: true) as bool;
+    // AppDb.box('settings').get('cacheSong', defaultValue: true) as bool;
     final int expiredAt = int.parse((playItem['expire_at'] ?? '0').toString());
     if ((DateTime.now().millisecondsSinceEpoch ~/ 1000) + 350 > expiredAt) {
       Logger.root.info(
         'before service | youtube link expired for ${playItem["title"]}',
       );
-      if (Hive.box('ytlinkcache').containsKey(playItem['id'])) {
-        final cache = await Hive.box('ytlinkcache').get(playItem['id']);
+      if (AppDb.box('ytlinkcache').containsKey(playItem['id'])) {
+        final cache = await AppDb.box('ytlinkcache').get(playItem['id']);
         if (cache is List) {
           int minExpiredAt = 0;
           for (final e in cache) {
@@ -287,9 +287,9 @@ class PlayerInvoke {
     await audioHandler.customAction('skipToMediaItem', {'index': index});
     await audioHandler.play();
     final String repeatMode =
-        Hive.box('settings').get('repeatMode', defaultValue: 'None').toString();
+        AppDb.box('settings').get('repeatMode', defaultValue: 'None').toString();
     final bool enforceRepeat =
-        Hive.box('settings').get('enforceRepeat', defaultValue: false) as bool;
+        AppDb.box('settings').get('enforceRepeat', defaultValue: false) as bool;
     if (enforceRepeat) {
       switch (repeatMode) {
         case 'None':
@@ -303,7 +303,7 @@ class PlayerInvoke {
       }
     } else {
       audioHandler.setRepeatMode(AudioServiceRepeatMode.none);
-      Hive.box('settings').put('repeatMode', 'None');
+      AppDb.box('settings').put('repeatMode', 'None');
     }
   }
 }

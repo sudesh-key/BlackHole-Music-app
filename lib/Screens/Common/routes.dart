@@ -28,10 +28,10 @@ import 'package:blackhole/Screens/Login/auth.dart';
 import 'package:blackhole/Screens/Login/pref.dart';
 import 'package:blackhole/Screens/Settings/new_settings_page.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 Widget initialFuntion() {
-  return Hive.box('settings').get('userId') != null ? HomePage() : AuthScreen();
+  return AppDb.box('settings').get('userId') != null ? HomePage() : AuthScreen();
 }
 
 final Map<String, Widget Function(BuildContext)> namedRoutes = {

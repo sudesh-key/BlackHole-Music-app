@@ -25,8 +25,8 @@ import 'package:blackhole/Screens/Home/saavn.dart';
 import 'package:blackhole/Screens/Search/search.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     String name =
-        Hive.box('settings').get('name', defaultValue: 'Guest') as String;
+        AppDb.box('settings').get('name', defaultValue: 'Guest') as String;
     final double screenWidth = MediaQuery.sizeOf(context).width;
     final bool rotated = MediaQuery.sizeOf(context).height < screenWidth;
     return SafeArea(
@@ -92,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               keyboardType: TextInputType.name,
                               onSubmitted:
                                   (String value, BuildContext context) {
-                                Hive.box('settings').put(
+                                AppDb.box('settings').put(
                                   'name',
                                   value.trim(),
                                 );
@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     ValueListenableBuilder(
-                                      valueListenable: Hive.box(
+                                      valueListenable: AppDb.box(
                                         'settings',
                                       ).listenable(),
                                       builder: (

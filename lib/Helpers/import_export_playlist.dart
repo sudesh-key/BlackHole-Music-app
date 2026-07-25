@@ -24,8 +24,8 @@ import 'package:blackhole/CustomWidgets/snackbar.dart';
 import 'package:blackhole/Helpers/picker.dart';
 import 'package:blackhole/Helpers/songs_count.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -48,8 +48,8 @@ Future<void> exportPlaylist(
       );
       return;
     }
-    await Hive.openBox(playlistName);
-    final Box playlistBox = Hive.box(playlistName);
+    await AppDb.openBox(playlistName);
+    final Box playlistBox = AppDb.box(playlistName);
     final Map songsMap = playlistBox.toMap();
     final String songs = json.encode(songsMap);
     File file;
@@ -86,16 +86,18 @@ Future<void> sharePlaylist(
   final Directory appDir = await getApplicationDocumentsDirectory();
   final String temp = appDir.path;
 
-  await Hive.openBox(playlistName);
-  final Box playlistBox = Hive.box(playlistName);
+  await AppDb.openBox(playlistName);
+  final Box playlistBox = AppDb.box(playlistName);
   final Map songsMap = playlistBox.toMap();
   final String songs = json.encode(songsMap);
   final File file = await File('$temp/$showName.json').create(recursive: true);
   await file.writeAsString(songs);
   final files = <XFile>[XFile(file.path)];
-  await Share.shareXFiles(
-    files,
-    text: AppLocalizations.of(context)!.playlistShareText,
+  await SharePlus.instance.share(
+    ShareParams(
+      files: files,
+      text: AppLocalizations.of(context)!.playlistShareText,
+    ),
   );
   await Future.delayed(const Duration(seconds: 10), () {});
   if (await file.exists()) {
@@ -154,7 +156,7 @@ Future<List> importFilePlaylist(
     final Map songsMap = json.decode(finString) as Map;
     final List songs = songsMap.values.toList();
     // playlistBox.put(mediaItem.id.toString(), info);
-    // Hive.box(play)
+    // AppDb.box(play)
 
     if (playlistName.trim() == '') {
       playlistName = 'Playlist ${playlistNames.length}';
@@ -164,10 +166,10 @@ Future<List> importFilePlaylist(
     }
     playlistNames.add(playlistName);
 
-    await Hive.openBox(playlistName);
-    final Box playlistBox = Hive.box(playlistName);
+    await AppDb.openBox(playlistName);
+    final Box playlistBox = AppDb.box(playlistName);
     await playlistBox.putAll(songsMap);
-    await Hive.box('settings').put('playlistNames', playlistNames);
+    await AppDb.box('settings').put('playlistNames', playlistNames);
 
     addSongsCount(
       playlistName,

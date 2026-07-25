@@ -24,9 +24,9 @@ import 'package:blackhole/Helpers/backup_restore.dart';
 import 'package:blackhole/Helpers/config.dart';
 import 'package:blackhole/constants/countrycodes.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:sizer/sizer.dart';
 
 class PrefScreen extends StatefulWidget {
@@ -56,12 +56,12 @@ class _PrefScreenState extends State<PrefScreen> {
     'Assamese',
   ];
   List<bool> isSelected = [true, false];
-  List preferredLanguage = Hive.box('settings')
+  List preferredLanguage = AppDb.box('settings')
       .get('preferredLanguage', defaultValue: ['Hindi'])?.toList() as List;
   String region =
-      Hive.box('settings').get('region', defaultValue: 'India') as String;
+      AppDb.box('settings').get('region', defaultValue: 'India') as String;
   bool useProxy =
-      Hive.box('settings').get('useProxy', defaultValue: false) as bool;
+      AppDb.box('settings').get('useProxy', defaultValue: false) as bool;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +100,7 @@ class _PrefScreenState extends State<PrefScreen> {
                         child: Text(
                           AppLocalizations.of(context)!.restore,
                           style: TextStyle(
-                            color: Colors.grey.withOpacity(0.7),
+                            color: Colors.grey.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
@@ -111,7 +111,7 @@ class _PrefScreenState extends State<PrefScreen> {
                         child: Text(
                           AppLocalizations.of(context)!.skip,
                           style: TextStyle(
-                            color: Colors.grey.withOpacity(0.7),
+                            color: Colors.grey.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
@@ -129,10 +129,11 @@ class _PrefScreenState extends State<PrefScreen> {
                         children: [
                           Row(
                             children: [
-                              RichText(
-                                text: TextSpan(
-                                  text:
-                                      '${AppLocalizations.of(context)!.welcome}\n',
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    text:
+                                        '${AppLocalizations.of(context)!.welcome}\n',
                                   style: TextStyle(
                                     fontSize: 46.sp,
                                     height: 1.0,
@@ -171,6 +172,7 @@ class _PrefScreenState extends State<PrefScreen> {
                                       ),
                                     ),
                                   ],
+                                ),
                                 ),
                               ),
                             ],
@@ -336,7 +338,7 @@ class _PrefScreenState extends State<PrefScreen> {
                                                               Navigator.pop(
                                                                 context,
                                                               );
-                                                              Hive.box(
+                                                              AppDb.box(
                                                                 'settings',
                                                               ).put(
                                                                 'preferredLanguage',
@@ -469,7 +471,7 @@ class _PrefScreenState extends State<PrefScreen> {
                                                         countries[idx],
                                                     onTap: () {
                                                       region = countries[idx];
-                                                      Hive.box('settings').put(
+                                                      AppDb.box('settings').put(
                                                         'region',
                                                         region,
                                                       );
@@ -499,7 +501,7 @@ class _PrefScreenState extends State<PrefScreen> {
                                                                     .of(context)!
                                                                 .useProxy,
                                                             onPressed: () {
-                                                              Hive.box(
+                                                              AppDb.box(
                                                                 'settings',
                                                               ).put(
                                                                 'useProxy',

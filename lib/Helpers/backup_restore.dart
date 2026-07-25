@@ -17,14 +17,16 @@
  * Copyright (c) 2021-2023, Ankit Sangwan
  */
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:blackhole/CustomWidgets/snackbar.dart';
 import 'package:blackhole/Helpers/picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_archive/flutter_archive.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
+import 'package:hive_ce/hive.dart' as legacy;
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -69,19 +71,18 @@ Future<String> createBackup(
       }
 
       for (int i = 0; i < boxNames.length; i++) {
-        await Hive.openBox(boxNames[i].toString());
+        final AppBox box = await AppDb.openBox(boxNames[i].toString());
+        final File exportFile = File('$savePath/${boxNames[i]}.bhdb.json');
         try {
-          await File(Hive.box(boxNames[i].toString()).path!)
-              .copy('$savePath/${boxNames[i]}.hive');
+          await exportFile.writeAsString(jsonEncode(box.exportData()));
         } catch (e) {
           await [
             Permission.manageExternalStorage,
           ].request();
-          await File(Hive.box(boxNames[i].toString()).path!)
-              .copy('$savePath/${boxNames[i]}.hive');
+          await exportFile.writeAsString(jsonEncode(box.exportData()));
         }
 
-        files.add(File('$savePath/${boxNames[i]}.hive'));
+        files.add(exportFile);
       }
 
       final now = DateTime.now();
@@ -126,6 +127,73 @@ Future<String> createBackup(
   }
 }
 
+/// A backup box is either a JSON export written by this (Drift based) version
+/// or a `.hive` box from the versions before it.
+enum _BackupFormat { driftJson, legacyHive }
+
+bool _isBackupFile(String path) {
+  final String name = path.toLowerCase();
+  return name.endsWith('.bhdb.json') || name.endsWith('.hive');
+}
+
+String _boxNameOf(String fileName) =>
+    fileName.replaceAll('.bhdb.json', '').replaceAll('.hive', '');
+
+/// Decided by the first byte — only a JSON export can start with `{` — so a
+/// backup keeps restoring even if its extension was changed along the way.
+/// The extension is the fallback for files that cannot be read.
+Future<_BackupFormat> _detectBackupFormat(File file) async {
+  try {
+    final List<int> head = await file.openRead(0, 1).first;
+    if (head.isNotEmpty) {
+      return head.first == 0x7B // '{'
+          ? _BackupFormat.driftJson
+          : _BackupFormat.legacyHive;
+    }
+  } catch (e) {
+    Logger.root.warning('Could not read the start of ${file.path}: $e');
+  }
+  return file.path.toLowerCase().endsWith('.bhdb.json')
+      ? _BackupFormat.driftJson
+      : _BackupFormat.legacyHive;
+}
+
+/// Reads one backup file with the reader its format needs and imports it.
+/// An empty backup leaves the existing box untouched rather than clearing it.
+Future<void> _restoreBackupFile(File file, Directory legacyDir) async {
+  final String fileName = file.path.split('/').last;
+  final String boxName = _boxNameOf(fileName);
+  final _BackupFormat format = await _detectBackupFormat(file);
+
+  Map data;
+  legacy.Box? oldBox;
+  if (format == _BackupFormat.driftJson) {
+    data = jsonDecode(await file.readAsString()) as Map;
+  } else {
+    // Hive resolves a box to the lowercased `<name>.hive` file while backups
+    // keep the original casing, so it is read through a lowercase copy: on a
+    // case sensitive filesystem Hive would otherwise open a new, empty box.
+    await file.copy('${legacyDir.path}/${boxName.toLowerCase()}.hive');
+    oldBox = await legacy.Hive.openBox(boxName, path: legacyDir.path);
+    data = oldBox.toMap();
+  }
+  Logger.root.info(
+    'Restoring $boxName from ${format.name} backup, ${data.length} entries',
+  );
+
+  if (data.isEmpty) {
+    Logger.root.warning('Backup for $boxName is empty, keeping existing data');
+  } else {
+    final AppBox box = await AppDb.openBox(boxName);
+    await box.clear();
+    await box.importData(
+      data,
+      encodedKeys: format == _BackupFormat.driftJson,
+    );
+  }
+  await oldBox?.close();
+}
+
 Future<void> restore(
   BuildContext context,
 ) async {
@@ -136,72 +204,68 @@ Future<void> restore(
     message: AppLocalizations.of(context)!.selectBackFile,
   );
   Logger.root.info('Selected restore file path: $savePath');
-  if (savePath != '') {
-    final isZip = savePath.endsWith('.zip');
-    if (isZip || savePath.endsWith('.hive')) {
-      final File zipFile = File(savePath);
-      final Directory tempDir = await getTemporaryDirectory();
-      Directory destinationDir = Directory('${tempDir.path}/restore');
-
-      try {
-        if (isZip) {
-          Logger.root.info('Extracting backup file');
-          await ZipFile.extractToDirectory(
-            zipFile: zipFile,
-            destinationDir: destinationDir,
-          );
-        } else {
-          Logger.root.info('Hive file is selected');
-          final splitPath = savePath.split('/');
-          splitPath.removeLast();
-          Logger.root.info('Changing path to ${splitPath.join("/")}');
-          destinationDir = Directory(splitPath.join('/'));
-        }
-        final List<FileSystemEntity> files = await destinationDir
-            .list()
-            .where((element) => element.path.endsWith('.hive'))
-            .toList();
-        Logger.root.info('Found ${files.length} backup files');
-
-        for (int i = 0; i < files.length; i++) {
-          final String backupPath = files[i].path;
-          final String boxName =
-              backupPath.split('/').last.replaceAll('.hive', '');
-          final Box box = await Hive.openBox(boxName);
-          final String boxPath = box.path!;
-          await box.close();
-
-          try {
-            await File(backupPath).copy(boxPath);
-          } finally {
-            await Hive.openBox(boxName);
-          }
-        }
-        if (isZip) {
-          await destinationDir.delete(recursive: true);
-        }
-        ShowSnackBar()
-            .showSnackBar(context, AppLocalizations.of(context)!.importSuccess);
-      } catch (e) {
-        Logger.root.severe('Error in restoring backup', e);
-        ShowSnackBar().showSnackBar(
-          context,
-          '${AppLocalizations.of(context)!.failedImport}\nError: $e',
-        );
-      }
-    } else {
-      Logger.root.severe('Error in restoring backup', 'Not a zip file');
-      ShowSnackBar().showSnackBar(
-        context,
-        '${AppLocalizations.of(context)!.failedImport}\nSelected file is not a zip file.',
-      );
-      return;
-    }
-  } else {
+  if (savePath == '') {
     Logger.root.severe('Error in restoring backup', 'No file selected');
     ShowSnackBar().showSnackBar(
       context,
       AppLocalizations.of(context)!.noFileSelected,
+    );
+    return;
+  }
+
+  final bool isZip = savePath.toLowerCase().endsWith('.zip');
+  if (!isZip && !_isBackupFile(savePath)) {
+    Logger.root.severe('Error in restoring backup', 'Unsupported file');
+    ShowSnackBar().showSnackBar(
+      context,
+      '${AppLocalizations.of(context)!.failedImport}\nSelect a .zip backup, or a single .bhdb.json / .hive file.',
+    );
+    return;
+  }
+
+  final Directory tempDir = await getTemporaryDirectory();
+  final Directory destinationDir = Directory('${tempDir.path}/restore');
+  final Directory legacyDir = Directory('${tempDir.path}/restore_legacy');
+
+  try {
+    final List<File> backupFiles;
+    if (isZip) {
+      Logger.root.info('Extracting backup file');
+      if (await destinationDir.exists()) {
+        await destinationDir.delete(recursive: true);
+      }
+      await ZipFile.extractToDirectory(
+        zipFile: File(savePath),
+        destinationDir: destinationDir,
+      );
+      backupFiles = destinationDir
+          .listSync()
+          .whereType<File>()
+          .where((File file) => _isBackupFile(file.path))
+          .toList();
+    } else {
+      Logger.root.info('Single backup file is selected');
+      backupFiles = [File(savePath)];
+    }
+    Logger.root.info('Found ${backupFiles.length} backup files');
+
+    await legacyDir.create(recursive: true);
+    legacy.Hive.init(legacyDir.path);
+    for (final File file in backupFiles) {
+      await _restoreBackupFile(file, legacyDir);
+    }
+
+    await legacyDir.delete(recursive: true);
+    if (isZip) {
+      await destinationDir.delete(recursive: true);
+    }
+    ShowSnackBar()
+        .showSnackBar(context, AppLocalizations.of(context)!.importSuccess);
+  } catch (e) {
+    Logger.root.severe('Error in restoring backup', e);
+    ShowSnackBar().showSnackBar(
+      context,
+      '${AppLocalizations.of(context)!.failedImport}\nError: $e',
     );
   }
 }

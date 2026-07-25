@@ -25,7 +25,7 @@ import 'package:blackhole/CustomWidgets/song_tile_trailing_menu.dart';
 import 'package:blackhole/Services/player_service.dart';
 import 'package:blackhole/Services/yt_music.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:logging/logging.dart';
 
 class YouTubeArtist extends StatefulWidget {
@@ -169,7 +169,7 @@ class _YouTubeArtistState extends State<YouTubeArtist> {
                                 //   YouTubeServices.instance
                                 //       .formatVideo(
                                 //     video: searchedList[i],
-                                //     quality: Hive.box('settings')
+                                //     quality: AppDb.box('settings')
                                 //         .get(
                                 //           'ytQuality',
                                 //           defaultValue: 'Low',

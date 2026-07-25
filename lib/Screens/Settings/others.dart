@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:blackhole/CustomWidgets/box_switch_tile.dart';
@@ -9,8 +10,8 @@ import 'package:blackhole/constants/languagecodes.dart';
 import 'package:blackhole/main.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -22,16 +23,16 @@ class OthersPage extends StatefulWidget {
 }
 
 class _OthersPageState extends State<OthersPage> {
-  final Box settingsBox = Hive.box('settings');
+  final Box settingsBox = AppDb.box('settings');
   final ValueNotifier<bool> includeOrExclude = ValueNotifier<bool>(
-    Hive.box('settings').get('includeOrExclude', defaultValue: false) as bool,
+    AppDb.box('settings').get('includeOrExclude', defaultValue: false) as bool,
   );
-  List includedExcludedPaths = Hive.box('settings')
+  List includedExcludedPaths = AppDb.box('settings')
       .get('includedExcludedPaths', defaultValue: []) as List;
   String lang =
-      Hive.box('settings').get('lang', defaultValue: 'English') as String;
+      AppDb.box('settings').get('lang', defaultValue: 'English') as String;
   bool useProxy =
-      Hive.box('settings').get('useProxy', defaultValue: false) as bool;
+      AppDb.box('settings').get('useProxy', defaultValue: false) as bool;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +93,7 @@ class _OthersPageState extends State<OthersPage> {
                                 LanguageCodes.languageCodes[newValue] ?? 'en',
                           ),
                         );
-                        Hive.box('settings').put('lang', newValue);
+                        AppDb.box('settings').put('lang', newValue);
                       },
                     );
                   }
@@ -170,7 +171,7 @@ class _OthersPageState extends State<OthersPage> {
                                           selectedColor: Theme.of(context)
                                               .colorScheme
                                               .secondary
-                                              .withOpacity(0.2),
+                                              .withValues(alpha: 0.2),
                                           labelStyle: TextStyle(
                                             color: !value
                                                 ? Theme.of(context)
@@ -206,7 +207,7 @@ class _OthersPageState extends State<OthersPage> {
                                           selectedColor: Theme.of(context)
                                               .colorScheme
                                               .secondary
-                                              .withOpacity(0.2),
+                                              .withValues(alpha: 0.2),
                                           labelStyle: TextStyle(
                                             color: value
                                                 ? Theme.of(context)
@@ -270,7 +271,7 @@ class _OthersPageState extends State<OthersPage> {
                                 if (temp.trim() != '' &&
                                     !includedExcludedPaths.contains(temp)) {
                                   includedExcludedPaths.add(temp);
-                                  Hive.box('settings').put(
+                                  AppDb.box('settings').put(
                                     'includedExcludedPaths',
                                     includedExcludedPaths,
                                   );
@@ -309,7 +310,7 @@ class _OthersPageState extends State<OthersPage> {
                                 tooltip: 'Remove',
                                 onPressed: () {
                                   includedExcludedPaths.removeAt(idx - 2);
-                                  Hive.box('settings').put(
+                                  AppDb.box('settings').put(
                                     'includedExcludedPaths',
                                     includedExcludedPaths,
                                   );
@@ -349,7 +350,7 @@ class _OthersPageState extends State<OthersPage> {
                     context,
                   )!
                       .minAudioAlert,
-                  initialText: (Hive.box('settings')
+                  initialText: (AppDb.box('settings')
                           .get('minDuration', defaultValue: 10) as int)
                       .toString(),
                   keyboardType: TextInputType.number,
@@ -357,7 +358,7 @@ class _OthersPageState extends State<OthersPage> {
                     if (value.trim() == '') {
                       value = '0';
                     }
-                    Hive.box('settings').put('minDuration', int.parse(value));
+                    AppDb.box('settings').put('minDuration', int.parse(value));
                     Navigator.pop(context);
                   },
                 );
@@ -513,7 +514,7 @@ class _OthersPageState extends State<OthersPage> {
                 ),
                 dense: true,
                 trailing: Text(
-                  '${Hive.box('settings').get("proxyIp", defaultValue: "103.47.67.134")}:${Hive.box('settings').get("proxyPort", defaultValue: 8080)}',
+                  '${AppDb.box('settings').get("proxyIp", defaultValue: "103.47.67.134")}:${AppDb.box('settings').get("proxyPort", defaultValue: 8080)}',
                   style: const TextStyle(fontSize: 12),
                 ),
                 onTap: () {
@@ -659,7 +660,12 @@ class _OthersPageState extends State<OthersPage> {
                 width: 70.0,
                 child: Center(
                   child: FutureBuilder(
-                    future: File(Hive.box('cache').path!).length(),
+                    future: Future<int>(
+                      () => AppDb.box('cache').values.fold<int>(
+                            0,
+                            (total, e) => total + jsonEncode(e).length,
+                          ),
+                    ),
                     builder: (
                       BuildContext context,
                       AsyncSnapshot<int> snapshot,
@@ -677,7 +683,7 @@ class _OthersPageState extends State<OthersPage> {
               dense: true,
               isThreeLine: true,
               onTap: () async {
-                Hive.box('cache').clear();
+                AppDb.box('cache').clear();
                 setState(
                   () {},
                 );
@@ -699,7 +705,7 @@ class _OthersPageState extends State<OthersPage> {
               onTap: () async {
                 final Directory tempDir = await getTemporaryDirectory();
                 final files = <XFile>[XFile('${tempDir.path}/logs/logs.txt')];
-                Share.shareXFiles(files);
+                SharePlus.instance.share(ShareParams(files: files));
               },
               dense: true,
               isThreeLine: true,

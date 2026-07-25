@@ -19,15 +19,15 @@
 
 import 'package:blackhole/CustomWidgets/gradient_containers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class Stats extends StatelessWidget {
   const Stats({super.key});
 
-  int get songsPlayed => Hive.box('stats').length;
+  int get songsPlayed => AppDb.box('stats').length;
   Map get mostPlayed =>
-      Hive.box('stats').get('mostPlayed', defaultValue: {}) as Map;
+      AppDb.box('stats').get('mostPlayed', defaultValue: {}) as Map;
 
   @override
   Widget build(BuildContext context) {

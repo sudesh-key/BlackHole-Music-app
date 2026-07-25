@@ -205,6 +205,8 @@
   "@downFilenameSub": {},
   "downLocation": "Download Location",
   "@downLocation": {},
+  "storageDenied": "Storage access denied, can't reach the download folder",
+  "@storageDenied": {},
   "downLyrics": "Download Lyrics",
   "@downLyrics": {},
   "downLyricsSub": "Downloading lyrics along with song, if available",

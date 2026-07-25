@@ -21,9 +21,9 @@ import 'dart:math';
 
 import 'package:blackhole/Screens/Player/audioplayer.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class Equalizer extends StatefulWidget {
   const Equalizer({super.key});
@@ -34,7 +34,7 @@ class Equalizer extends StatefulWidget {
 
 class _EqualizerState extends State<Equalizer> {
   bool enabled =
-      Hive.box('settings').get('setEqualizer', defaultValue: false) as bool;
+      AppDb.box('settings').get('setEqualizer', defaultValue: false) as bool;
   AudioPlayerHandler audioHandler = GetIt.I<AudioPlayerHandler>();
 
   @override
@@ -51,10 +51,10 @@ class _EqualizerState extends State<Equalizer> {
             SwitchListTile(
               title: Text(AppLocalizations.of(context)!.equalizer),
               value: enabled,
-              activeColor: Theme.of(context).colorScheme.secondary,
+              activeThumbColor: Theme.of(context).colorScheme.secondary,
               onChanged: (value) {
                 enabled = value;
-                Hive.box('settings').put('setEqualizer', value);
+                AppDb.box('settings').put('setEqualizer', value);
                 audioHandler.customAction('setEqualizer', {'value': value});
                 setState(() {});
               },
@@ -150,7 +150,7 @@ class _VerticalSliderState extends State<VerticalSlider> {
   double? sliderValue;
 
   void setGain(int bandIndex, double gain) {
-    Hive.box('settings').put('equalizerBand$bandIndex', gain);
+    AppDb.box('settings').put('equalizerBand$bandIndex', gain);
     widget.audioHandler
         .customAction('setBandGain', {'band': bandIndex, 'gain': gain});
   }
@@ -169,7 +169,7 @@ class _VerticalSliderState extends State<VerticalSlider> {
           child: Slider(
             activeColor: Theme.of(context).colorScheme.secondary,
             inactiveColor:
-                Theme.of(context).colorScheme.secondary.withOpacity(0.4),
+                Theme.of(context).colorScheme.secondary.withValues(alpha: 0.4),
             value: sliderValue ?? widget.value!,
             min: widget.min!,
             max: widget.max!,

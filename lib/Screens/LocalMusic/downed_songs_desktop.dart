@@ -31,8 +31,8 @@ import 'package:blackhole/Helpers/audio_query.dart';
 import 'package:blackhole/Services/player_service.dart';
 // import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -55,7 +55,7 @@ class DownloadedSongsDesktop extends StatefulWidget {
 class _DownloadedSongsDesktopState extends State<DownloadedSongsDesktop>
     with TickerProviderStateMixin {
   List<Map> _songs = [];
-  String? tempPath = Hive.box('settings').get('tempDirPath')?.toString();
+  String? tempPath = AppDb.box('settings').get('tempDirPath')?.toString();
   final Map<String, List<Map>> _albums = {};
   final Map<String, List<Map>> _artists = {};
   final Map<String, List<Map>> _genres = {};
@@ -66,18 +66,18 @@ class _DownloadedSongsDesktopState extends State<DownloadedSongsDesktop>
   // final List<String> _videos = [];
 
   bool added = false;
-  int sortValue = Hive.box('settings').get('sortValue', defaultValue: 1) as int;
+  int sortValue = AppDb.box('settings').get('sortValue', defaultValue: 1) as int;
   int orderValue =
-      Hive.box('settings').get('orderValue', defaultValue: 1) as int;
+      AppDb.box('settings').get('orderValue', defaultValue: 1) as int;
   int albumSortValue =
-      Hive.box('settings').get('albumSortValue', defaultValue: 2) as int;
+      AppDb.box('settings').get('albumSortValue', defaultValue: 2) as int;
   List dirPaths =
-      Hive.box('settings').get('searchPaths', defaultValue: []) as List;
+      AppDb.box('settings').get('searchPaths', defaultValue: []) as List;
   int minDuration =
-      Hive.box('settings').get('minDuration', defaultValue: 10) as int;
+      AppDb.box('settings').get('minDuration', defaultValue: 10) as int;
   bool includeOrExclude =
-      Hive.box('settings').get('includeOrExclude', defaultValue: false) as bool;
-  List includedExcludedPaths = Hive.box('settings')
+      AppDb.box('settings').get('includeOrExclude', defaultValue: false) as bool;
+  List includedExcludedPaths = AppDb.box('settings')
       .get('includedExcludedPaths', defaultValue: []) as List;
   TabController? _tcontroller;
   OfflineAudioQuery offlineAudioQuery = OfflineAudioQuery();
@@ -269,10 +269,10 @@ class _DownloadedSongsDesktopState extends State<DownloadedSongsDesktop>
             //     onSelected: (int value) async {
             //       if (value < 6) {
             //         sortValue = value;
-            //         Hive.box('settings').put('sortValue', value);
+            //         AppDb.box('settings').put('sortValue', value);
             //       } else {
             //         orderValue = value - 6;
-            //         Hive.box('settings').put('orderValue', orderValue);
+            //         AppDb.box('settings').put('orderValue', orderValue);
             //       }
             //       // await sortSongs(sortValue, orderValue);
             //       setState(() {});

@@ -21,8 +21,8 @@ import 'package:blackhole/APIs/api.dart';
 import 'package:blackhole/CustomWidgets/snackbar.dart';
 import 'package:blackhole/Services/download.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class DownloadButton extends StatefulWidget {
   final Map data;
@@ -41,7 +41,7 @@ class DownloadButton extends StatefulWidget {
 
 class _DownloadButtonState extends State<DownloadButton> {
   late Download down;
-  final Box downloadsBox = Hive.box('downloads');
+  final Box downloadsBox = AppDb.box('downloads');
   final ValueNotifier<bool> showStopButton = ValueNotifier<bool>(false);
 
   @override

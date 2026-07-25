@@ -28,18 +28,18 @@ import 'package:blackhole/Helpers/playlist.dart';
 import 'package:blackhole/Helpers/search_add_playlist.dart';
 import 'package:blackhole/Helpers/spotify_helper.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:mdi_icons/mdi_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ImportPlaylist extends StatelessWidget {
   ImportPlaylist({super.key});
 
-  final Box settingsBox = Hive.box('settings');
+  final Box settingsBox = AppDb.box('settings');
   final List playlistNames =
-      Hive.box('settings').get('playlistNames')?.toList() as List? ??
+      AppDb.box('settings').get('playlistNames')?.toList() as List? ??
           ['Favorite Songs'];
 
   void _triggerImport({required String type, required BuildContext context}) {
@@ -167,7 +167,7 @@ Future<void> connectToSpotify(
       mode: LaunchMode.externalApplication,
     );
     final appLinks = AppLinks();
-    appLinks.allUriLinkStream.listen(
+    appLinks.uriLinkStream.listen(
       (uri) async {
         final link = uri.toString();
         if (link.contains('code=')) {
@@ -269,7 +269,7 @@ Future<void> importResso(
       if (data.isNotEmpty) {
         String playName = data['title'].toString();
         while (playlistNames.contains(playName) ||
-            await Hive.boxExists(playName)) {
+            await AppDb.boxExists(playName)) {
           // ignore: use_string_buffers
           playName = '$playName (1)';
         }
@@ -317,7 +317,7 @@ Future<void> importSpotify(
       data['tracks'] != null &&
       (data['tracks'] as List).isNotEmpty) {
     String playName = data['title'].toString();
-    while (playlistNames.contains(playName) || await Hive.boxExists(playName)) {
+    while (playlistNames.contains(playName) || await AppDb.boxExists(playName)) {
       // ignore: use_string_buffers
       playName = '$playName (1)';
     }

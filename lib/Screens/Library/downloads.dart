@@ -19,8 +19,7 @@
 
 import 'dart:io';
 
-import 'package:audiotagger/audiotagger.dart';
-import 'package:audiotagger/models/tag.dart';
+import 'package:metadata_god/metadata_god.dart';
 import 'package:blackhole/CustomWidgets/custom_physics.dart';
 import 'package:blackhole/CustomWidgets/data_search.dart';
 import 'package:blackhole/CustomWidgets/empty_screen.dart';
@@ -35,8 +34,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
 // import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -49,7 +48,7 @@ class Downloads extends StatefulWidget {
 
 class _DownloadsState extends State<Downloads>
     with SingleTickerProviderStateMixin {
-  Box downloadsBox = Hive.box('downloads');
+  Box downloadsBox = AppDb.box('downloads');
   bool added = false;
   List _songs = [];
   final Map<String, List<Map>> _albums = {};
@@ -61,12 +60,12 @@ class _DownloadsState extends State<Downloads>
   TabController? _tcontroller;
   int _currentTabIndex = 0;
   // int currentIndex = 0;
-  // String? tempPath = Hive.box('settings').get('tempDirPath')?.toString();
-  int sortValue = Hive.box('settings').get('sortValue', defaultValue: 1) as int;
+  // String? tempPath = AppDb.box('settings').get('tempDirPath')?.toString();
+  int sortValue = AppDb.box('settings').get('sortValue', defaultValue: 1) as int;
   int orderValue =
-      Hive.box('settings').get('orderValue', defaultValue: 1) as int;
+      AppDb.box('settings').get('orderValue', defaultValue: 1) as int;
   int albumSortValue =
-      Hive.box('settings').get('albumSortValue', defaultValue: 2) as int;
+      AppDb.box('settings').get('albumSortValue', defaultValue: 2) as int;
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<bool> _showShuffle = ValueNotifier<bool>(true);
 
@@ -90,7 +89,7 @@ class _DownloadsState extends State<Downloads>
     // _tcontroller!.addListener(changeTitle);
     // if (tempPath == null) {
     //   getTemporaryDirectory().then((value) {
-    //     Hive.box('settings').put('tempDirPath', value.path);
+    //     AppDb.box('settings').put('tempDirPath', value.path);
     //   });
     // }
     getDownloads();
@@ -372,17 +371,17 @@ class _DownloadsState extends State<Downloads>
                       (int value) {
                     if (value < 5) {
                       sortValue = value;
-                      Hive.box('settings').put('sortValue', value);
+                      AppDb.box('settings').put('sortValue', value);
                     } else {
                       orderValue = value - 5;
-                      Hive.box('settings').put('orderValue', orderValue);
+                      AppDb.box('settings').put('orderValue', orderValue);
                     }
                     sortSongs(sortVal: sortValue, order: orderValue);
                     setState(() {});
                     //   }
                     // : (int value) {
                     //     albumSortValue = value;
-                    //     Hive.box('settings')
+                    //     AppDb.box('settings')
                     //         .put('albumSortValue', value);
                     //     sortAlbums();
                     //     setState(() {});
@@ -553,8 +552,6 @@ Future<Map> editTags(Map song, BuildContext context) async {
   await showDialog(
     context: context,
     builder: (BuildContext context) {
-      final tagger = Audiotagger();
-
       FileImage songImage = FileImage(File(song['image'].toString()));
 
       final titlecontroller =
@@ -597,22 +594,21 @@ Future<Map> editTags(Map song, BuildContext context) async {
 
                       songImage = FileImage(File(imagePath));
 
-                      final Tag tag = Tag(
-                        artwork: imagePath,
-                      );
                       try {
                         await [
                           Permission.manageExternalStorage,
                         ].request();
-                        await tagger.writeTags(
-                          path: song['path'].toString(),
-                          tag: tag,
+                        await MetadataGod.writeMetadata(
+                          file: song['path'].toString(),
+                          metadata: Metadata(
+                            picture: Picture(
+                              data: File(imagePath).readAsBytesSync(),
+                              mimeType: 'image/jpeg',
+                            ),
+                          ),
                         );
                       } catch (e) {
-                        await tagger.writeTags(
-                          path: song['path'].toString(),
-                          tag: tag,
-                        );
+                        Logger.root.severe('Failed to write artwork', e);
                       }
                     }
                   },
@@ -786,33 +782,26 @@ Future<Map> editTags(Map song, BuildContext context) async {
               song['genre'] = genrecontroller.text;
               song['year'] = yearcontroller.text;
               song['path'] = pathcontroller.text;
-              final tag = Tag(
+              final metadata = Metadata(
                 title: titlecontroller.text,
                 artist: artistcontroller.text,
                 album: albumcontroller.text,
                 genre: genrecontroller.text,
-                year: yearcontroller.text,
+                year: int.tryParse(yearcontroller.text),
                 albumArtist: albumArtistController.text,
               );
               try {
-                try {
-                  await [
-                    Permission.manageExternalStorage,
-                  ].request();
-                  tagger.writeTags(
-                    path: song['path'].toString(),
-                    tag: tag,
-                  );
-                } catch (e) {
-                  await tagger.writeTags(
-                    path: song['path'].toString(),
-                    tag: tag,
-                  );
-                  ShowSnackBar().showSnackBar(
-                    context,
-                    AppLocalizations.of(context)!.successTagEdit,
-                  );
-                }
+                await [
+                  Permission.manageExternalStorage,
+                ].request();
+                await MetadataGod.writeMetadata(
+                  file: song['path'].toString(),
+                  metadata: metadata,
+                );
+                ShowSnackBar().showSnackBar(
+                  context,
+                  AppLocalizations.of(context)!.successTagEdit,
+                );
               } catch (e) {
                 Logger.root.severe('Failed to edit tags', e);
                 ShowSnackBar().showSnackBar(
@@ -866,9 +855,13 @@ class _DownSongsTabState extends State<DownSongsTab>
 
     try {
       await file.create();
-      final image = await Audiotagger().readArtwork(path: songFilePath);
+      final Metadata metadata =
+          await MetadataGod.readMetadata(file: songFilePath);
+      final image = metadata.picture?.data;
       if (image != null) {
         file.writeAsBytesSync(image);
+      } else {
+        throw Exception('No embedded artwork');
       }
     } catch (e) {
       final HttpClientRequest request2 =
@@ -1002,7 +995,7 @@ class _DownSongsTabState extends State<DownSongsTab>
                                   widget.songs[index] as Map,
                                   context,
                                 );
-                                Hive.box('downloads').put(
+                                AppDb.box('downloads').put(
                                   widget.songs[index]['id'],
                                   widget.songs[index],
                                 );

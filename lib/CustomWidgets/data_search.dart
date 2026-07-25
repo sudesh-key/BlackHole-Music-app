@@ -24,8 +24,8 @@ import 'package:blackhole/Helpers/audio_query.dart';
 import 'package:blackhole/Services/player_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:on_audio_query/on_audio_query.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:on_audio_query_forked/on_audio_query.dart';
 
 class DataSearch extends SearchDelegate {
   final List<SongModel> data;

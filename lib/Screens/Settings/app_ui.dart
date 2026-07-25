@@ -4,8 +4,8 @@ import 'package:blackhole/CustomWidgets/textinput_dialog.dart';
 import 'package:blackhole/Screens/Settings/player_gradient.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class AppUIPage extends StatefulWidget {
   final Function? callback;
@@ -16,26 +16,28 @@ class AppUIPage extends StatefulWidget {
 }
 
 class _AppUIPageState extends State<AppUIPage> {
-  final Box settingsBox = Hive.box('settings');
-  List blacklistedHomeSections = Hive.box('settings')
+  final Box settingsBox = AppDb.box('settings');
+  List blacklistedHomeSections = AppDb.box('settings')
       .get('blacklistedHomeSections', defaultValue: []) as List;
-  List miniButtonsOrder = Hive.box('settings').get(
+  List miniButtonsOrder = AppDb.box('settings').get(
     'miniButtonsOrder',
     defaultValue: ['Like', 'Previous', 'Play/Pause', 'Next', 'Download'],
   ) as List;
-  List preferredMiniButtons = Hive.box('settings').get(
+  List preferredMiniButtons = AppDb.box('settings').get(
     'preferredMiniButtons',
     defaultValue: ['Like', 'Play/Pause', 'Next'],
   )?.toList() as List;
-  List<int> preferredCompactNotificationButtons = Hive.box('settings').get(
-    'preferredCompactNotificationButtons',
-    defaultValue: [1, 2, 3],
-  ) as List<int>;
-  List sectionsToShow = Hive.box('settings').get(
+  List<int> preferredCompactNotificationButtons = List<int>.from(
+    AppDb.box('settings').get(
+      'preferredCompactNotificationButtons',
+      defaultValue: [1, 2, 3],
+    ) as List,
+  );
+  List sectionsToShow = AppDb.box('settings').get(
     'sectionsToShow',
     defaultValue: ['Home', 'Top Charts', 'YouTube', 'Library'],
   ) as List;
-  final List sectionsAvailableToShow = Hive.box('settings').get(
+  final List sectionsAvailableToShow = AppDb.box('settings').get(
     'sectionsAvailableToShow',
     defaultValue: ['Top Charts', 'YouTube', 'Library', 'Settings'],
   ) as List;
@@ -277,11 +279,11 @@ class _AppUIPageState extends State<AppUIPage> {
                                     preferredMiniButtons = temp;
                                     miniButtonsOrder = order;
                                     Navigator.pop(context);
-                                    Hive.box('settings').put(
+                                    AppDb.box('settings').put(
                                       'preferredMiniButtons',
                                       preferredMiniButtons,
                                     );
-                                    Hive.box('settings').put(
+                                    AppDb.box('settings').put(
                                       'miniButtonsOrder',
                                       order,
                                     );
@@ -466,7 +468,7 @@ class _AppUIPageState extends State<AppUIPage> {
                                     preferredCompactNotificationButtons =
                                         checked.toList()..sort();
                                     Navigator.pop(context);
-                                    Hive.box('settings').put(
+                                    AppDb.box('settings').put(
                                       'preferredCompactNotificationButtons',
                                       preferredCompactNotificationButtons,
                                     );
@@ -552,7 +554,7 @@ class _AppUIPageState extends State<AppUIPage> {
                                         blacklistedHomeSections.add(
                                           value.trim().toLowerCase(),
                                         );
-                                        Hive.box('settings').put(
+                                        AppDb.box('settings').put(
                                           'blacklistedHomeSections',
                                           blacklistedHomeSections,
                                         );
@@ -582,7 +584,7 @@ class _AppUIPageState extends State<AppUIPage> {
                                       onPressed: () {
                                         blacklistedHomeSections
                                             .removeAt(idx - 1);
-                                        Hive.box('settings').put(
+                                        AppDb.box('settings').put(
                                           'blacklistedHomeSections',
                                           blacklistedHomeSections,
                                         );
@@ -842,11 +844,11 @@ class _AppUIPageState extends State<AppUIPage> {
                                 }
                                 sectionsToShow = newSectionsToShow;
                                 Navigator.pop(context);
-                                Hive.box('settings').put(
+                                AppDb.box('settings').put(
                                   'sectionsToShow',
                                   sectionsToShow,
                                 );
-                                Hive.box('settings').put(
+                                AppDb.box('settings').put(
                                   'sectionsAvailableToShow',
                                   sectionsAvailableToShow,
                                 );

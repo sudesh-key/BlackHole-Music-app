@@ -19,8 +19,7 @@
 
 import 'dart:convert';
 
-import 'package:audiotagger/audiotagger.dart';
-import 'package:audiotagger/models/tag.dart';
+import 'dart:io';
 import 'package:blackhole/APIs/spotify_api.dart';
 import 'package:blackhole/Helpers/matcher.dart';
 import 'package:blackhole/Helpers/spotify_helper.dart';
@@ -66,12 +65,19 @@ class Lyrics {
           result['source'] = res['source']!;
         }
       } else {
-        Logger.root
-            .info('Lyrics not available on Saavn, finding on Musixmatch');
-        result['lyrics'] =
-            await getMusixMatchLyrics(title: title, artist: artist);
-        result['type'] = 'text';
-        result['source'] = 'Musixmatch';
+        Logger.root.info('Lyrics not available on Saavn, trying LRCLIB');
+        final Map<String, String> lrcLib =
+            await getLrcLibLyrics(title: title, artist: artist);
+        result['lyrics'] = lrcLib['lyrics']!;
+        result['type'] = lrcLib['type']!;
+        result['source'] = 'LRCLIB';
+        if (result['lyrics'] == '') {
+          Logger.root.info('Lyrics not found on LRCLIB, finding on Musixmatch');
+          result['lyrics'] =
+              await getMusixMatchLyrics(title: title, artist: artist);
+          result['type'] = 'text';
+          result['source'] = 'Musixmatch';
+        }
         if (result['lyrics'] == '') {
           Logger.root
               .info('Lyrics not found on Musixmatch, searching on Google');
@@ -87,10 +93,15 @@ class Lyrics {
 
   static Future<String> getSaavnLyrics(String id) async {
     try {
-      final Uri lyricsUrl = Uri.https(
-        'www.jiosaavn.com',
-        '/api.php?__call=lyrics.getLyrics&lyrics_id=$id&ctx=web6dot0&api_version=4&_format=json',
-      );
+      // The query has to be passed as parameters: putting it in the path makes
+      // `Uri.https` escape the '?' and Saavn answers with an HTML error page.
+      final Uri lyricsUrl = Uri.https('www.jiosaavn.com', '/api.php', {
+        '__call': 'lyrics.getLyrics',
+        'lyrics_id': id,
+        'ctx': 'web6dot0',
+        'api_version': '4',
+        '_format': 'json',
+      });
       final Response res =
           await get(lyricsUrl, headers: {'Accept': 'application/json'});
 
@@ -108,6 +119,42 @@ class Lyrics {
       Logger.root.severe('Error in getSaavnLyrics', e);
       return '';
     }
+  }
+
+  /// LRCLIB is an open lyrics database that needs no key and often carries
+  /// synced (LRC) lyrics, which the player renders line by line.
+  static Future<Map<String, String>> getLrcLibLyrics({
+    required String title,
+    required String artist,
+  }) async {
+    final Map<String, String> result = {'lyrics': '', 'type': 'text'};
+    try {
+      final Response res = await get(
+        Uri.https('lrclib.net', '/api/search', {'q': '$title $artist'}),
+        headers: {'Accept': 'application/json'},
+      );
+      if (res.statusCode != 200) {
+        Logger.root.info('LRCLIB returned ${res.statusCode}');
+        return result;
+      }
+      final List hits = json.decode(res.body) as List;
+      for (final hit in hits) {
+        final Map track = hit as Map;
+        final String synced = track['syncedLyrics']?.toString() ?? '';
+        if (synced.isNotEmpty) {
+          result['lyrics'] = synced;
+          result['type'] = 'lrc';
+          return result;
+        }
+        final String plain = track['plainLyrics']?.toString() ?? '';
+        if (plain.isNotEmpty && result['lyrics'] == '') {
+          result['lyrics'] = plain;
+        }
+      }
+    } catch (e) {
+      Logger.root.severe('Error in getLrcLibLyrics', e);
+    }
+    return result;
   }
 
   static Future<Map<String, String>> getSpotifyLyrics(
@@ -223,52 +270,46 @@ class Lyrics {
         '</div></div></div></div><div class="hwc"><div class="BNeawe tAd8D AP7Wnd"><div><div class="BNeawe tAd8D AP7Wnd">';
     const String delimiter2 =
         '</div></div></div></div></div><div><span class="hwc"><div class="BNeawe uEec3 AP7Wnd">';
-    String lyrics = '';
-    try {
-      lyrics = (await get(
-        Uri.parse(Uri.encodeFull('$url$title by $artist lyrics')),
-      ))
-          .body;
-      lyrics = lyrics.split(delimiter1).last;
-      lyrics = lyrics.split(delimiter2).first;
-      if (lyrics.contains('<meta charset="UTF-8">')) throw Error();
-    } catch (_) {
+    // Google only carries lyrics when its answer box is in the markup. Without
+    // both delimiters `split` hands back the whole document, which is how a
+    // consent or "enable JavaScript" page used to end up on screen as lyrics.
+    String extract(String body) {
+      if (!body.contains(delimiter1) || !body.contains(delimiter2)) return '';
+      final String lyrics =
+          body.split(delimiter1).last.split(delimiter2).first.trim();
+      return lyrics.contains('<') ? '' : lyrics;
+    }
+
+    for (final String query in [
+      '$title by $artist lyrics',
+      '$title by $artist song lyrics',
+      '${title.split("-").first} by $artist lyrics',
+    ]) {
       try {
-        lyrics = (await get(
-          Uri.parse(
-            Uri.encodeFull('$url$title by $artist song lyrics'),
-          ),
-        ))
-            .body;
-        lyrics = lyrics.split(delimiter1).last;
-        lyrics = lyrics.split(delimiter2).first;
-        if (lyrics.contains('<meta charset="UTF-8">')) throw Error();
-      } catch (_) {
-        try {
-          lyrics = (await get(
-            Uri.parse(
-              Uri.encodeFull(
-                '$url${title.split("-").first} by $artist lyrics',
-              ),
-            ),
-          ))
-              .body;
-          lyrics = lyrics.split(delimiter1).last;
-          lyrics = lyrics.split(delimiter2).first;
-          if (lyrics.contains('<meta charset="UTF-8">')) throw Error();
-        } catch (_) {
-          lyrics = '';
-        }
+        final Response res =
+            await get(Uri.parse(Uri.encodeFull('$url$query')));
+        final String lyrics = extract(res.body);
+        if (lyrics != '') return lyrics;
+      } catch (e) {
+        Logger.root.info('Google lyrics search failed for "$query": $e');
       }
     }
-    return lyrics.trim();
+    Logger.root.info('No lyrics found on Google');
+    return '';
   }
 
   static Future<String> getOffLyrics(String path) async {
     try {
-      final Audiotagger tagger = Audiotagger();
-      final Tag? tags = await tagger.readTags(path: path);
-      return tags?.lyrics ?? '';
+      // Embedded-tag lyrics support was dropped along with the discontinued
+      // `audiotagger` package. Look for a sidecar .lrc/.txt file instead.
+      final String base = path.replaceAll(RegExp(r'\.[^.]+$'), '');
+      for (final ext in ['.lrc', '.txt']) {
+        final File lyricsFile = File('$base$ext');
+        if (lyricsFile.existsSync()) {
+          return lyricsFile.readAsStringSync();
+        }
+      }
+      return '';
     } catch (e) {
       return '';
     }

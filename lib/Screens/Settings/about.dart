@@ -7,9 +7,9 @@ import 'package:blackhole/Helpers/github.dart';
 import 'package:blackhole/Helpers/update.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
+import 'package:mdi_icons/mdi_icons.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -116,7 +116,7 @@ class _AboutPageState extends State<AboutPage> {
                                     onPressed: () async {
                                       String arch = '';
                                       if (Platform.isAndroid) {
-                                        List? abis = await Hive.box('settings')
+                                        List? abis = await AppDb.box('settings')
                                             .get('supportedAbis') as List?;
 
                                         if (abis == null) {
@@ -127,7 +127,7 @@ class _AboutPageState extends State<AboutPage> {
                                               await deviceInfo.androidInfo;
                                           abis =
                                               androidDeviceInfo.supportedAbis;
-                                          await Hive.box('settings')
+                                          await AppDb.box('settings')
                                               .put('supportedAbis', abis);
                                         }
                                         if (abis.contains('arm64')) {
@@ -178,10 +178,12 @@ class _AboutPageState extends State<AboutPage> {
                               .shareAppSub,
                         ),
                         onTap: () {
-                          Share.share(
-                            '${AppLocalizations.of(
-                              context,
-                            )!.shareAppText}: https://sangwan5688.github.io/',
+                          SharePlus.instance.share(
+                            ShareParams(
+                              text: '${AppLocalizations.of(
+                                context,
+                              )!.shareAppText}: https://sangwan5688.github.io/',
+                            ),
                           );
                         },
                         dense: true,
@@ -299,7 +301,7 @@ class _AboutPageState extends State<AboutPage> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(
+                                            icon: Icon(
                                               MdiIcons.gmail,
                                             ),
                                             iconSize: 40,
@@ -330,8 +332,8 @@ class _AboutPageState extends State<AboutPage> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(
-                                              MdiIcons.telegram,
+                                            icon: Icon(
+                                              Icons.telegram,
                                             ),
                                             iconSize: 40,
                                             tooltip: AppLocalizations.of(
@@ -361,7 +363,7 @@ class _AboutPageState extends State<AboutPage> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(
+                                            icon: Icon(
                                               MdiIcons.instagram,
                                             ),
                                             iconSize: 40,
@@ -424,8 +426,8 @@ class _AboutPageState extends State<AboutPage> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(
-                                              MdiIcons.telegram,
+                                            icon: Icon(
+                                              Icons.telegram,
                                             ),
                                             iconSize: 40,
                                             tooltip: AppLocalizations.of(
@@ -455,8 +457,8 @@ class _AboutPageState extends State<AboutPage> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(
-                                              MdiIcons.telegram,
+                                            icon: Icon(
+                                              Icons.telegram,
                                             ),
                                             iconSize: 40,
                                             tooltip: AppLocalizations.of(

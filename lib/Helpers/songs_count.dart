@@ -17,11 +17,11 @@
  * Copyright (c) 2021-2023, Ankit Sangwan
  */
 
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 void addSongsCount(String playlistName, int len, List images) {
   final Map playlistDetails =
-      Hive.box('settings').get('playlistDetails', defaultValue: {}) as Map;
+      AppDb.box('settings').get('playlistDetails', defaultValue: {}) as Map;
   if (playlistDetails.containsKey(playlistName)) {
     playlistDetails[playlistName].addAll({'count': len, 'imagesList': images});
   } else {
@@ -29,5 +29,5 @@ void addSongsCount(String playlistName, int len, List images) {
       MapEntry(playlistName, {'count': len, 'imagesList': images}),
     ]);
   }
-  Hive.box('settings').put('playlistDetails', playlistDetails);
+  AppDb.box('settings').put('playlistDetails', playlistDetails);
 }

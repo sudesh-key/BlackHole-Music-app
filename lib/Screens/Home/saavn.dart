@@ -36,15 +36,15 @@ import 'package:blackhole/Screens/Library/liked.dart';
 import 'package:blackhole/Screens/Search/artists.dart';
 import 'package:blackhole/Services/player_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 bool fetched = false;
-List preferredLanguage = Hive.box('settings')
+List preferredLanguage = AppDb.box('settings')
     .get('preferredLanguage', defaultValue: ['Hindi']) as List;
 List likedRadio =
-    Hive.box('settings').get('likedRadio', defaultValue: []) as List;
-Map data = Hive.box('cache').get('homepage', defaultValue: {}) as Map;
+    AppDb.box('settings').get('likedRadio', defaultValue: []) as List;
+Map data = AppDb.box('cache').get('homepage', defaultValue: {}) as Map;
 List lists = ['recent', 'playlist', ...?data['collections'] as List?];
 
 class SaavnHomePage extends StatefulWidget {
@@ -55,23 +55,23 @@ class SaavnHomePage extends StatefulWidget {
 class _SaavnHomePageState extends State<SaavnHomePage>
     with AutomaticKeepAliveClientMixin<SaavnHomePage> {
   List recentList =
-      Hive.box('cache').get('recentSongs', defaultValue: []) as List;
+      AppDb.box('cache').get('recentSongs', defaultValue: []) as List;
   Map likedArtists =
-      Hive.box('settings').get('likedArtists', defaultValue: {}) as Map;
-  List blacklistedHomeSections = Hive.box('settings')
+      AppDb.box('settings').get('likedArtists', defaultValue: {}) as Map;
+  List blacklistedHomeSections = AppDb.box('settings')
       .get('blacklistedHomeSections', defaultValue: []) as List;
   List playlistNames =
-      Hive.box('settings').get('playlistNames')?.toList() as List? ??
+      AppDb.box('settings').get('playlistNames')?.toList() as List? ??
           ['Favorite Songs'];
   Map playlistDetails =
-      Hive.box('settings').get('playlistDetails', defaultValue: {}) as Map;
+      AppDb.box('settings').get('playlistDetails', defaultValue: {}) as Map;
   int recentIndex = 0;
   int playlistIndex = 1;
 
   Future<void> getHomePageData() async {
     Map recievedData = await SaavnAPI().fetchHomePageData();
     if (recievedData.isNotEmpty) {
-      Hive.box('cache').put('homepage', recievedData);
+      AppDb.box('cache').put('homepage', recievedData);
       data = recievedData;
       lists = ['recent', 'playlist', ...?data['collections'] as List?];
       lists.insert((lists.length / 2).round(), 'likedArtists');
@@ -79,7 +79,7 @@ class _SaavnHomePageState extends State<SaavnHomePage>
     setState(() {});
     recievedData = await FormatResponse.formatPromoLists(data);
     if (recievedData.isNotEmpty) {
-      Hive.box('cache').put('homepage', recievedData);
+      AppDb.box('cache').put('homepage', recievedData);
       data = recievedData;
       lists = ['recent', 'playlist', ...?data['collections'] as List?];
       lists.insert((lists.length / 2).round(), 'likedArtists');
@@ -121,7 +121,7 @@ class _SaavnHomePageState extends State<SaavnHomePage>
   }
 
   int likedCount() {
-    return Hive.box('Favorite Songs').length;
+    return AppDb.box('Favorite Songs').length;
   }
 
   @override
@@ -158,7 +158,7 @@ class _SaavnHomePageState extends State<SaavnHomePage>
             itemBuilder: (context, idx) {
               if (idx == recentIndex) {
                 return ValueListenableBuilder(
-                  valueListenable: Hive.box('settings').listenable(),
+                  valueListenable: AppDb.box('settings').listenable(),
                   child: Column(
                     children: [
                       GestureDetector(
@@ -207,7 +207,7 @@ class _SaavnHomePageState extends State<SaavnHomePage>
                   playlistNames.isNotEmpty &&
                   playlistDetails.isNotEmpty) {
                 return ValueListenableBuilder(
-                  valueListenable: Hive.box('settings').listenable(),
+                  valueListenable: AppDb.box('settings').listenable(),
                   child: Column(
                     children: [
                       GestureDetector(
@@ -334,7 +334,7 @@ class _SaavnHomePageState extends State<SaavnHomePage>
                                 ),
                               ),
                               onTap: () async {
-                                await Hive.openBox(name);
+                                await AppDb.openBox(name);
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -496,7 +496,7 @@ class _SaavnHomePageState extends State<SaavnHomePage>
                                                     ?.toString()
                                                     .toLowerCase(),
                                               );
-                                              Hive.box('settings').put(
+                                              AppDb.box('settings').put(
                                                 'blacklistedHomeSections',
                                                 blacklistedHomeSections,
                                               );
@@ -823,7 +823,7 @@ class _SaavnHomePageState extends State<SaavnHomePage>
                                                                   .remove(item)
                                                               : likedRadio
                                                                   .add(item);
-                                                          Hive.box('settings')
+                                                          AppDb.box('settings')
                                                               .put(
                                                             'likedRadio',
                                                             likedRadio,

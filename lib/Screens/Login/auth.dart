@@ -21,9 +21,9 @@ import 'package:blackhole/CustomWidgets/gradient_containers.dart';
 import 'package:blackhole/Helpers/backup_restore.dart';
 import 'package:blackhole/Helpers/config.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:uuid/uuid.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -42,10 +42,10 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future _addUserData(String name) async {
-    await Hive.box('settings').put('name', name.trim());
+    await AppDb.box('settings').put('name', name.trim());
 
     final String userId = uuid.v1();
-    await Hive.box('settings').put('userId', userId);
+    await AppDb.box('settings').put('userId', userId);
   }
 
   @override
@@ -86,7 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: Text(
                           AppLocalizations.of(context)!.restore,
                           style: TextStyle(
-                            color: Colors.grey.withOpacity(0.7),
+                            color: Colors.grey.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
@@ -100,7 +100,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: Text(
                           AppLocalizations.of(context)!.skip,
                           style: TextStyle(
-                            color: Colors.grey.withOpacity(0.7),
+                            color: Colors.grey.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
@@ -265,7 +265,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   child: Text(
                                     '${AppLocalizations.of(context)!.disclaimer} ${AppLocalizations.of(context)!.disclaimerText}',
                                     style: TextStyle(
-                                      color: Colors.grey.withOpacity(0.7),
+                                      color: Colors.grey.withValues(alpha: 0.7),
                                     ),
                                   ),
                                 ),

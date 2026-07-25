@@ -20,12 +20,20 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
+import 'package:logging/logging.dart';
 
 Future<void> downloadChecker() async {
-  final List songs = Hive.box('downloads').values.toList();
+  // Opened rather than read straight away: `AppDb.box` hands back an empty box
+  // while it loads, which would leave stale entries (a restored backup brings
+  // paths from the device the backup came from) in place.
+  final Box box = await AppDb.openBox('downloads');
+  final List songs = box.values.toList();
   final List<String> keys = await compute(checkPaths, songs);
-  await Hive.box('downloads').deleteAll(keys);
+  if (keys.isNotEmpty) {
+    Logger.root.info('Removing ${keys.length} downloads with missing files');
+    await box.deleteAll(keys);
+  }
 }
 
 Future<List<String>> checkPaths(List songs) async {

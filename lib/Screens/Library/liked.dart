@@ -33,8 +33,8 @@ import 'package:blackhole/Services/player_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 // import 'package:path_provider/path_provider.dart';
 
 final ValueNotifier<bool> selectMode = ValueNotifier<bool>(false);
@@ -60,7 +60,7 @@ class _LikedSongsState extends State<LikedSongs>
     with SingleTickerProviderStateMixin {
   Box? likedBox;
   bool added = false;
-  // String? tempPath = Hive.box('settings').get('tempDirPath')?.toString();
+  // String? tempPath = AppDb.box('settings').get('tempDirPath')?.toString();
   List _songs = [];
   final Map<String, List<Map>> _albums = {};
   final Map<String, List<Map>> _artists = {};
@@ -70,11 +70,11 @@ class _LikedSongsState extends State<LikedSongs>
   List _sortedGenreKeysList = [];
   TabController? _tcontroller;
   // int currentIndex = 0;
-  int sortValue = Hive.box('settings').get('sortValue', defaultValue: 1) as int;
+  int sortValue = AppDb.box('settings').get('sortValue', defaultValue: 1) as int;
   int orderValue =
-      Hive.box('settings').get('orderValue', defaultValue: 1) as int;
+      AppDb.box('settings').get('orderValue', defaultValue: 1) as int;
   int albumSortValue =
-      Hive.box('settings').get('albumSortValue', defaultValue: 2) as int;
+      AppDb.box('settings').get('albumSortValue', defaultValue: 2) as int;
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<bool> _showShuffle = ValueNotifier<bool>(true);
   int _currentTabIndex = 0;
@@ -102,7 +102,7 @@ class _LikedSongsState extends State<LikedSongs>
     });
     // if (tempPath == null) {
     //   getTemporaryDirectory().then((value) {
-    //     Hive.box('settings').put('tempDirPath', value.path);
+    //     AppDb.box('settings').put('tempDirPath', value.path);
     //   });
     // }
     // _tcontroller!.addListener(changeTitle);
@@ -124,7 +124,7 @@ class _LikedSongsState extends State<LikedSongs>
   // }
 
   void getLiked() {
-    likedBox = Hive.box(widget.playlistName);
+    likedBox = AppDb.box(widget.playlistName);
     if (widget.fromPlaylist) {
       _songs = widget.songs!;
     } else {
@@ -190,7 +190,7 @@ class _LikedSongsState extends State<LikedSongs>
   void sortSongs({required int sortVal, required int order}) {
     switch (sortVal) {
       case -1:
-        final List order = Hive.box('settings')
+        final List order = AppDb.box('settings')
             .get('order_${widget.playlistName}', defaultValue: []) as List;
         final keyIndices = Map.fromIterables(
           order,
@@ -425,10 +425,10 @@ class _LikedSongsState extends State<LikedSongs>
                             (int value) {
                           if (value < 5) {
                             sortValue = value;
-                            Hive.box('settings').put('sortValue', value);
+                            AppDb.box('settings').put('sortValue', value);
                           } else {
                             orderValue = value - 5;
-                            Hive.box('settings').put('orderValue', orderValue);
+                            AppDb.box('settings').put('orderValue', orderValue);
                           }
                           sortSongs(
                             sortVal: sortValue,
@@ -438,7 +438,7 @@ class _LikedSongsState extends State<LikedSongs>
                         },
                         // : (int value) {
                         //     albumSortValue = value;
-                        //     Hive.box('settings').put('albumSortValue', value);
+                        //     AppDb.box('settings').put('albumSortValue', value);
                         //     sortAlbums();
                         //     setState(() {});
                         //   },
@@ -575,10 +575,10 @@ class _LikedSongsState extends State<LikedSongs>
                       },
                       sortSongs: (int sortVal, int? orderVal) {
                         sortValue = sortVal;
-                        Hive.box('settings').put('sortValue', sortVal);
+                        AppDb.box('settings').put('sortValue', sortVal);
                         if (orderVal != null && orderVal != orderValue) {
                           orderValue = orderVal;
-                          Hive.box('settings').put('orderValue', orderVal);
+                          AppDb.box('settings').put('orderValue', orderVal);
                         }
                         sortSongs(
                           sortVal: sortVal,
@@ -682,7 +682,7 @@ class _SongsTabState extends State<SongsTab>
 
   void _saveItems() {
     final List newOrder = widget.songs.map((e) => e['id']).toList();
-    Hive.box('settings').put('order_${widget.playlistName}', newOrder);
+    AppDb.box('settings').put('order_${widget.playlistName}', newOrder);
     widget.sortSongs(-1, 0);
   }
 

@@ -60,7 +60,13 @@ class CustomBottomNavBar extends StatelessWidget {
     return ColoredBox(
       color: backgroundColor ?? Colors.transparent,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+        // Keep the items clear of the system navigation bar while the
+        // background still bleeds behind it (app is edge-to-edge).
+        padding: EdgeInsets.only(
+          left: 10.0,
+          right: 10.0,
+          bottom: MediaQuery.paddingOf(context).bottom,
+        ),
         child: Row(
           mainAxisAlignment: items.length <= 2
               ? MainAxisAlignment.spaceEvenly
@@ -84,18 +90,18 @@ class CustomBottomNavBar extends StatelessWidget {
 
                   return Material(
                     color: Color.lerp(
-                      selectedColor.withOpacity(0.0),
-                      selectedColor.withOpacity(selectedColorOpacity ?? 0.1),
+                      selectedColor.withValues(alpha: 0.0),
+                      selectedColor.withValues(alpha: selectedColorOpacity ?? 0.1),
                       t,
                     ),
                     shape: itemShape,
                     child: InkWell(
                       onTap: () => onTap?.call(items.indexOf(item)),
                       customBorder: itemShape,
-                      focusColor: selectedColor.withOpacity(0.1),
-                      highlightColor: selectedColor.withOpacity(0.1),
-                      splashColor: selectedColor.withOpacity(0.1),
-                      hoverColor: selectedColor.withOpacity(0.1),
+                      focusColor: selectedColor.withValues(alpha: 0.1),
+                      highlightColor: selectedColor.withValues(alpha: 0.1),
+                      splashColor: selectedColor.withValues(alpha: 0.1),
+                      hoverColor: selectedColor.withValues(alpha: 0.1),
                       child: Padding(
                         padding: itemPadding -
                             (Directionality.of(context) == TextDirection.ltr
@@ -141,7 +147,7 @@ class CustomBottomNavBar extends StatelessWidget {
                                     child: DefaultTextStyle(
                                       style: TextStyle(
                                         color: Color.lerp(
-                                          selectedColor.withOpacity(0.0),
+                                          selectedColor.withValues(alpha: 0.0),
                                           selectedColor,
                                           t,
                                         ),

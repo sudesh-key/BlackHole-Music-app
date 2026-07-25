@@ -28,7 +28,7 @@ import 'package:blackhole/Screens/Search/search.dart';
 import 'package:blackhole/Services/yt_music.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -186,7 +186,9 @@ class _SongTileTrailingMenuState extends State<SongTileTrailingMenu> {
       onSelected: (value) {
         switch (value) {
           case 3:
-            Share.share(widget.data['perma_url'].toString());
+            SharePlus.instance.share(
+              ShareParams(text: widget.data['perma_url'].toString()),
+            );
 
           case 4:
             Navigator.push(
@@ -378,7 +380,11 @@ class _YtSongTileTrailingMenuState extends State<YtSongTileTrailingMenu> {
           );
         }
         if (value == 5) {
-          Share.share('https://youtube.com/watch?v=${widget.data["id"]}');
+          SharePlus.instance.share(
+            ShareParams(
+              text: 'https://youtube.com/watch?v=${widget.data["id"]}',
+            ),
+          );
         }
       },
     );

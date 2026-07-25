@@ -25,10 +25,10 @@ import 'package:blackhole/Helpers/import_export_playlist.dart';
 import 'package:blackhole/Screens/Library/import.dart';
 import 'package:blackhole/Screens/Library/liked.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:mdi_icons/mdi_icons.dart';
 
 class PlaylistScreen extends StatefulWidget {
   @override
@@ -36,12 +36,12 @@ class PlaylistScreen extends StatefulWidget {
 }
 
 class _PlaylistScreenState extends State<PlaylistScreen> {
-  final Box settingsBox = Hive.box('settings');
+  final Box settingsBox = AppDb.box('settings');
   final List playlistNames =
-      Hive.box('settings').get('playlistNames')?.toList() as List? ??
+      AppDb.box('settings').get('playlistNames')?.toList() as List? ??
           ['Favorite Songs'];
   Map playlistDetails =
-      Hive.box('settings').get('playlistDetails', defaultValue: {}) as Map;
+      AppDb.box('settings').get('playlistDetails', defaultValue: {}) as Map;
   @override
   Widget build(BuildContext context) {
     if (!playlistNames.contains('Favorite Songs')) {
@@ -92,7 +92,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         value = 'Playlist ${playlistNames.length}';
                       }
                       while (playlistNames.contains(value) ||
-                          await Hive.boxExists(value)) {
+                          await AppDb.boxExists(value)) {
                         // ignore: use_string_buffers
                         value = '$value (1)';
                       }
@@ -297,7 +297,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                           in playlistsToMerge.sublist(1)) {
                                         try {
                                           final Box playlistBox =
-                                              await Hive.openBox(
+                                              await AppDb.openBox(
                                             playlistName,
                                           );
                                           final Map songsMap =
@@ -318,7 +318,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                         }
                                       }
                                       final Box finalPlaylistBox =
-                                          await Hive.openBox(
+                                          await AppDb.openBox(
                                         playlistsToMerge.first,
                                       );
                                       finalPlaylistBox.putAll(finalMap);
@@ -473,8 +473,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                 'playlistNames',
                                 playlistNames,
                               );
-                              await Hive.openBox(name);
-                              await Hive.box(name).deleteFromDisk();
+                              await AppDb.openBox(name);
+                              await AppDb.box(name).deleteFromDisk();
                             }
                             if (value == 3) {
                               showDialog(
@@ -627,7 +627,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                               value: 1,
                               child: Row(
                                 children: [
-                                  const Icon(MdiIcons.export),
+                                  Icon(MdiIcons.export),
                                   const SizedBox(width: 10.0),
                                   Text(
                                     AppLocalizations.of(context)!.export,
@@ -639,7 +639,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                               value: 2,
                               child: Row(
                                 children: [
-                                  const Icon(MdiIcons.share),
+                                  Icon(MdiIcons.share),
                                   const SizedBox(width: 10.0),
                                   Text(
                                     AppLocalizations.of(context)!.share,
@@ -650,7 +650,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                           ],
                         ),
                         onTap: () async {
-                          await Hive.openBox(name);
+                          await AppDb.openBox(name);
                           Navigator.push(
                             context,
                             MaterialPageRoute(

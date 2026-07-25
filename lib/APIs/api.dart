@@ -20,17 +20,17 @@
 import 'dart:convert';
 
 import 'package:blackhole/Helpers/format.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:http/http.dart';
 import 'package:logging/logging.dart';
 
 class SaavnAPI {
-  List preferredLanguages = Hive.box('settings')
+  List preferredLanguages = AppDb.box('settings')
       .get('preferredLanguage', defaultValue: ['Hindi']) as List;
   Map<String, String> headers = {};
   String baseUrl = 'www.jiosaavn.com';
   String apiStr = '/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0';
-  Box settingsBox = Hive.box('settings');
+  Box settingsBox = AppDb.box('settings');
   Map<String, String> endpoints = {
     'homeData': '__call=webapi.getLaunchData',
     'topSearches': '__call=content.getTopSearches',
@@ -56,16 +56,19 @@ class SaavnAPI {
     String params, {
     bool usev4 = true,
     bool useProxy = true,
+    String ctx = 'web6dot0',
   }) async {
-    Uri url;
-    if (!usev4) {
-      url = Uri.https(
-        baseUrl,
-        '$apiStr&$params'.replaceAll('&api_version=4', ''),
-      );
-    } else {
-      url = Uri.https(baseUrl, '$apiStr&$params');
-    }
+    // Build the full URL as a string and parse it. Uri.https() treats its
+    // second argument as a PATH and percent-encodes the '?' in apiStr, which
+    // can produce a request JioSaavn rejects.
+    final String base =
+        ctx == 'web6dot0' ? apiStr : apiStr.replaceAll('ctx=web6dot0', 'ctx=$ctx');
+    final String query =
+        usev4 ? '$base&$params' : '$base&$params'.replaceAll('&api_version=4', '');
+    // Search queries arrive unencoded; spaces must not reach Uri.parse raw.
+    final Uri url = Uri.parse(
+      'https://$baseUrl$query'.replaceAll(' ', '%20'),
+    );
     preferredLanguages =
         preferredLanguages.map((lang) => lang.toLowerCase()).toList();
     final String languageHeader = 'L=${preferredLanguages.join('%2C')}';
@@ -95,7 +98,9 @@ class SaavnAPI {
         );
       });
     }
-    return get(url, headers: headers).onError((error, stackTrace) {
+    final Response response =
+        await get(url, headers: headers).onError((error, stackTrace) {
+      Logger.root.severe('Saavn request failed: $url\nError: $error');
       return Response(
         {
           'status': 'failure',
@@ -104,6 +109,15 @@ class SaavnAPI {
         404,
       );
     });
+    if (response.statusCode != 200) {
+      final String snippet = response.body.length > 300
+          ? '${response.body.substring(0, 300)}...'
+          : response.body;
+      Logger.root.severe(
+        'Saavn ${response.statusCode} for $url\nBody: $snippet',
+      );
+    }
+    return response;
   }
 
   Future<Map> fetchHomePageData() async {
@@ -112,7 +126,19 @@ class SaavnAPI {
       final res = await getResponse(endpoints['homeData']!, useProxy: false);
       if (res.statusCode == 200) {
         final Map data = json.decode(res.body) as Map;
+        Logger.root.info(
+          'Saavn homepage keys: ${data.keys.toList()}',
+        );
         result = await FormatResponse.formatHomePageData(data);
+        if (result.isEmpty) {
+          Logger.root.severe(
+            'Saavn homepage formatted to empty. raw keys: ${data.keys.toList()}',
+          );
+        }
+      } else {
+        Logger.root.severe(
+          'fetchHomePageData got status ${res.statusCode}',
+        );
       }
     } catch (e) {
       Logger.root.severe('Error in fetchHomePageData: $e');
@@ -207,14 +233,31 @@ class SaavnAPI {
 
   Future<List> getReco(String pid) async {
     final String params = "${endpoints['getReco']}&pid=$pid";
-    final res = await getResponse(params);
+    // The web context answers this call with an empty list for every song,
+    // which left autoplay with nothing to queue. The app context still
+    // returns recommendations, keyed by the song id instead of a bare list.
+    final res = await getResponse(params, ctx: 'android');
     if (res.statusCode == 200 && res.body.isNotEmpty) {
-      final List getMain = json.decode(res.body) as List;
+      final dynamic decoded = json.decode(res.body);
+      final List getMain = decoded is List ? decoded : _recoListOf(decoded, pid);
       return FormatResponse.formatSongsResponse(getMain, 'song');
     } else {
       Logger.root.severe(
         'Error in getReco returned status: ${res.statusCode}, response: ${res.body}',
       );
+    }
+    return List.empty();
+  }
+
+  List _asList(dynamic value) => value is List ? value : List.empty();
+
+  /// Pulls the song list out of `{pid: [...]}`, tolerating a response keyed by
+  /// something other than the id we asked for.
+  List _recoListOf(dynamic decoded, String pid) {
+    if (decoded is! Map) return List.empty();
+    if (decoded[pid] is List) return decoded[pid] as List;
+    for (final dynamic value in decoded.values) {
+      if (value is List) return value;
     }
     return List.empty();
   }
@@ -297,7 +340,18 @@ class SaavnAPI {
       final res = await getResponse(params);
       if (res.statusCode == 200) {
         final Map getMain = json.decode(res.body) as Map;
-        final List responseList = getMain['results'] as List;
+        final List? responseList = getMain['results'] as List?;
+        if (responseList == null) {
+          final String snippet = res.body.length > 300
+              ? '${res.body.substring(0, 300)}...'
+              : res.body;
+          Logger.root
+              .severe('Saavn search response has no "results": $snippet');
+          return {
+            'songs': List.empty(),
+            'error': getMain['error'] ?? 'Unexpected response from Saavn',
+          };
+        }
         final finalSongs =
             await FormatResponse.formatSongsResponse(responseList, 'song');
         if (finalSongs.length > count) {
@@ -512,15 +566,18 @@ class SaavnAPI {
     final res = await getResponse(params);
     if (res.statusCode == 200) {
       final getMain = json.decode(res.body) as Map;
-      final List topSongsResponseList = getMain['topSongs'] as List;
-      final List latestReleaseResponseList = getMain['latest_release'] as List;
-      final List topAlbumsResponseList = getMain['topAlbums'] as List;
-      final List singlesResponseList = getMain['singles'] as List;
+      // An unknown or stale token comes back with `{}` where these lists are
+      // expected, so every section is read defensively: the screen then shows
+      // its empty state instead of throwing.
+      final List topSongsResponseList = _asList(getMain['topSongs']);
+      final List latestReleaseResponseList = _asList(getMain['latest_release']);
+      final List topAlbumsResponseList = _asList(getMain['topAlbums']);
+      final List singlesResponseList = _asList(getMain['singles']);
       final List dedicatedResponseList =
-          getMain['dedicated_artist_playlist'] as List;
+          _asList(getMain['dedicated_artist_playlist']);
       final List featuredResponseList =
-          getMain['featured_artist_playlist'] as List;
-      final List similarArtistsResponseList = getMain['similarArtists'] as List;
+          _asList(getMain['featured_artist_playlist']);
+      final List similarArtistsResponseList = _asList(getMain['similarArtists']);
 
       final List topSongsSearchedList =
           await FormatResponse.formatSongsResponse(

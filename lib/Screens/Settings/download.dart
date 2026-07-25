@@ -4,8 +4,8 @@ import 'package:blackhole/CustomWidgets/snackbar.dart';
 import 'package:blackhole/Helpers/picker.dart';
 import 'package:blackhole/Services/ext_storage_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class DownloadPage extends StatefulWidget {
   const DownloadPage({super.key});
@@ -15,15 +15,15 @@ class DownloadPage extends StatefulWidget {
 }
 
 class _DownloadPageState extends State<DownloadPage> {
-  final Box settingsBox = Hive.box('settings');
-  String downloadPath = Hive.box('settings')
+  final Box settingsBox = AppDb.box('settings');
+  String downloadPath = AppDb.box('settings')
       .get('downloadPath', defaultValue: '/storage/emulated/0/Music') as String;
-  String downloadQuality = Hive.box('settings')
+  String downloadQuality = AppDb.box('settings')
       .get('downloadQuality', defaultValue: '320 kbps') as String;
-  String ytDownloadQuality = Hive.box('settings')
+  String ytDownloadQuality = AppDb.box('settings')
       .get('ytDownloadQuality', defaultValue: 'High') as String;
   int downFilename =
-      Hive.box('settings').get('downFilename', defaultValue: 0) as int;
+      AppDb.box('settings').get('downFilename', defaultValue: 0) as int;
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +78,7 @@ class _DownloadPageState extends State<DownloadPage> {
                     setState(
                       () {
                         downloadQuality = newValue;
-                        Hive.box('settings').put('downloadQuality', newValue);
+                        AppDb.box('settings').put('downloadQuality', newValue);
                       },
                     );
                   }
@@ -121,7 +121,7 @@ class _DownloadPageState extends State<DownloadPage> {
                     setState(
                       () {
                         ytDownloadQuality = newValue;
-                        Hive.box('settings').put('ytDownloadQuality', newValue);
+                        AppDb.box('settings').put('ytDownloadQuality', newValue);
                       },
                     );
                   }
@@ -159,7 +159,7 @@ class _DownloadPageState extends State<DownloadPage> {
                         writeAccess: true,
                       ) ??
                       '/storage/emulated/0/Music';
-                  Hive.box('settings').put('downloadPath', downloadPath);
+                  AppDb.box('settings').put('downloadPath', downloadPath);
                   setState(
                     () {},
                   );
@@ -181,7 +181,7 @@ class _DownloadPageState extends State<DownloadPage> {
                 );
                 if (temp.trim() != '') {
                   downloadPath = temp;
-                  Hive.box('settings').put('downloadPath', temp);
+                  AppDb.box('settings').put('downloadPath', temp);
                   setState(
                     () {},
                   );

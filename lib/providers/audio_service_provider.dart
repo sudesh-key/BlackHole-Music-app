@@ -42,7 +42,7 @@ class AudioHandlerHelper {
         androidNotificationIcon: 'drawable/ic_stat_music_note',
         androidShowNotificationBadge: true,
         androidStopForegroundOnPause: false,
-        // Hive.box('settings').get('stopServiceOnPause', defaultValue: true) as bool,
+        // AppDb.box('settings').get('stopServiceOnPause', defaultValue: true) as bool,
         notificationColor: Colors.grey[900],
       ),
     );

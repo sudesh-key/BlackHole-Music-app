@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class BoxSwitchTile extends StatelessWidget {
   const BoxSwitchTile({
@@ -24,10 +24,10 @@ class BoxSwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
-      valueListenable: Hive.box('settings').listenable(),
+      valueListenable: AppDb.box('settings').listenable(),
       builder: (BuildContext context, Box box, Widget? widget) {
         return SwitchListTile(
-          activeColor: Theme.of(context).colorScheme.secondary,
+          activeThumbColor: Theme.of(context).colorScheme.secondary,
           contentPadding: contentPadding,
           title: title,
           subtitle: subtitle,

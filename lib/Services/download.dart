@@ -19,8 +19,6 @@
 
 import 'dart:io';
 
-import 'package:audiotagger/audiotagger.dart';
-import 'package:audiotagger/models/tag.dart';
 import 'package:blackhole/CustomWidgets/snackbar.dart';
 import 'package:blackhole/Helpers/lyrics.dart';
 import 'package:blackhole/Services/ext_storage_provider.dart';
@@ -29,8 +27,8 @@ import 'package:blackhole/Services/youtube_services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 // import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:http/http.dart';
 import 'package:logging/logging.dart';
 import 'package:metadata_god/metadata_god.dart';
@@ -56,21 +54,21 @@ class Download with ChangeNotifier {
 
   int? rememberOption;
   final ValueNotifier<bool> remember = ValueNotifier<bool>(false);
-  String preferredDownloadQuality = Hive.box('settings')
+  String preferredDownloadQuality = AppDb.box('settings')
       .get('downloadQuality', defaultValue: '320 kbps') as String;
-  String preferredYtDownloadQuality = Hive.box('settings')
+  String preferredYtDownloadQuality = AppDb.box('settings')
       .get('ytDownloadQuality', defaultValue: 'High') as String;
-  String downloadFormat = Hive.box('settings')
+  String downloadFormat = AppDb.box('settings')
       .get('downloadFormat', defaultValue: 'm4a')
       .toString();
-  bool createDownloadFolder = Hive.box('settings')
+  bool createDownloadFolder = AppDb.box('settings')
       .get('createDownloadFolder', defaultValue: false) as bool;
-  bool createYoutubeFolder = Hive.box('settings')
+  bool createYoutubeFolder = AppDb.box('settings')
       .get('createYoutubeFolder', defaultValue: false) as bool;
   double? progress = 0.0;
   String lastDownloadId = '';
   bool downloadLyrics =
-      Hive.box('settings').get('downloadLyrics', defaultValue: false) as bool;
+      AppDb.box('settings').get('downloadLyrics', defaultValue: false) as bool;
   bool download = true;
 
   Future<void> prepareDownload(
@@ -81,21 +79,17 @@ class Download with ChangeNotifier {
   }) async {
     Logger.root.info('Preparing download for ${data['title']}');
     download = true;
-    if (Platform.isAndroid || Platform.isIOS) {
-      Logger.root.info('Requesting storage permission');
-      PermissionStatus status = await Permission.storage.status;
-      if (status.isDenied) {
-        Logger.root.info('Request denied');
-        await [
-          Permission.storage,
-          Permission.accessMediaLocation,
-          Permission.mediaLibrary,
-        ].request();
-      }
-      status = await Permission.storage.status;
-      if (status.isPermanentlyDenied) {
-        Logger.root.info('Request permanently denied');
-        await openAppSettings();
+    if (Platform.isAndroid) {
+      Logger.root.info('Requesting storage access');
+      if (!await ExtStorageProvider.requestStorageAccess()) {
+        Logger.root.severe('Storage access denied, cannot download');
+        if (context.mounted) {
+          ShowSnackBar().showSnackBar(
+            context,
+            AppLocalizations.of(context)!.storageDenied,
+          );
+        }
+        return;
       }
     }
     final RegExp avoid = RegExp(r'[\.\\\*\:\"\?#/;\|]');
@@ -103,7 +97,7 @@ class Download with ChangeNotifier {
 
     String filename = '';
     final int downFilename =
-        Hive.box('settings').get('downFilename', defaultValue: 0) as int;
+        AppDb.box('settings').get('downFilename', defaultValue: 0) as int;
     if (downFilename == 0) {
       filename = '${data["title"]} - ${data["artist"]}';
     } else if (downFilename == 1) {
@@ -113,7 +107,7 @@ class Download with ChangeNotifier {
     }
     // String filename = '${data["title"]} - ${data["artist"]}';
     String dlPath =
-        Hive.box('settings').get('downloadPath', defaultValue: '') as String;
+        AppDb.box('settings').get('downloadPath', defaultValue: '') as String;
     Logger.root.info('Cached Download path: $dlPath');
     if (filename.length > 200) {
       final String temp = filename.substring(0, 200);
@@ -129,7 +123,17 @@ class Download with ChangeNotifier {
         dirName: 'Music',
         writeAccess: true,
       );
-      dlPath = temp!;
+      if (temp == null) {
+        Logger.root.severe('Download aborted, no access to the download folder');
+        if (context.mounted) {
+          ShowSnackBar().showSnackBar(
+            context,
+            AppLocalizations.of(context)!.storageDenied,
+          );
+        }
+        return;
+      }
+      dlPath = temp;
     }
     Logger.root.info('New Download path: $dlPath');
     if (data['url'].toString().contains('google') && createYoutubeFolder) {
@@ -253,7 +257,7 @@ class Download with ChangeNotifier {
                             ),
                             onPressed: () async {
                               Navigator.pop(context);
-                              Hive.box('downloads').delete(data['id']);
+                              AppDb.box('downloads').delete(data['id']);
                               downloadSong(context, dlPath, filename, data);
                               rememberOption = 1;
                             },
@@ -320,7 +324,7 @@ class Download with ChangeNotifier {
     final artname = fileName.replaceAll('.m4a', '.jpg');
     if (!Platform.isWindows) {
       Logger.root.info('Getting App Path for storing image');
-      appPath = Hive.box('settings').get('tempDirPath')?.toString();
+      appPath = AppDb.box('settings').get('tempDirPath')?.toString();
       appPath ??= (await getTemporaryDirectory()).path;
     } else {
       final Directory? temp = await getDownloadsDirectory();
@@ -483,65 +487,28 @@ class Download with ChangeNotifier {
         //   }
         // }
         Logger.root.info('Getting audio tags');
-        if (Platform.isAndroid) {
-          try {
-            final Tag tag = Tag(
+        try {
+          Logger.root.info('Started tag editing');
+          await MetadataGod.writeMetadata(
+            file: filepath!,
+            metadata: Metadata(
               title: data['title'].toString(),
               artist: data['artist'].toString(),
               albumArtist: data['album_artist']?.toString() ??
                   data['artist']?.toString().split(', ')[0] ??
                   '',
-              artwork: filepath2,
               album: data['album'].toString(),
               genre: data['language'].toString(),
-              year: data['year'].toString(),
-              lyrics: lyrics,
-              comment: 'BlackHole',
-            );
-            Logger.root.info('Started tag editing');
-            final tagger = Audiotagger();
-            await tagger.writeTags(
-              path: filepath!,
-              tag: tag,
-            );
-            // await Future.delayed(const Duration(seconds: 1), () async {
-            //   if (await file2.exists()) {
-            //     await file2.delete();
-            //   }
-            // });
-          } catch (e) {
-            Logger.root.severe('Error editing tags: $e');
-          }
-        } else {
-          // Set metadata to file
-          if (data['language'].toString() == 'YouTube') {
-            // skipping metadata for saavn for the time being as it corrupts the file
-            await MetadataGod.writeMetadata(
-              file: filepath!,
-              metadata: Metadata(
-                title: data['title'].toString(),
-                artist: data['artist'].toString(),
-                albumArtist: data['album_artist']?.toString() ??
-                    data['artist']?.toString().split(', ')[0] ??
-                    '',
-                album: data['album'].toString(),
-                genre: data['language'].toString(),
-                year: int.parse(data['year'].toString()),
-                // lyrics: lyrics,
-                // comment: 'BlackHole',
-                // trackNumber: 1,
-                // trackTotal: 12,
-                // discNumber: 1,
-                // discTotal: 5,
-                durationMs: int.parse(data['duration'].toString()) * 1000,
-                fileSize: file.lengthSync(),
-                picture: Picture(
-                  data: bytes2,
-                  mimeType: 'image/jpeg',
-                ),
+              year: int.tryParse(data['year'].toString()),
+              fileSize: BigInt.from(file.lengthSync()),
+              picture: Picture(
+                data: bytes2,
+                mimeType: 'image/jpeg',
               ),
-            );
-          }
+            ),
+          );
+        } catch (e) {
+          Logger.root.severe('Error editing tags: $e');
         }
         Logger.root.info('Closing connection & notifying listeners');
         client.close();
@@ -572,7 +539,7 @@ class Download with ChangeNotifier {
           'from_yt': data['language'].toString() == 'YouTube',
           'dateAdded': DateTime.now().toString(),
         };
-        Hive.box('downloads').put(songData['id'].toString(), songData);
+        AppDb.box('downloads').put(songData['id'].toString(), songData);
 
         Logger.root.info('Everything done, showing snackbar');
         ShowSnackBar().showSnackBar(

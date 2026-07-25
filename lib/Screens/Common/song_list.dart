@@ -33,7 +33,7 @@ import 'package:blackhole/Helpers/extensions.dart';
 import 'package:blackhole/Models/url_image_generator.dart';
 import 'package:blackhole/Services/player_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:logging/logging.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -227,8 +227,11 @@ class _SongsListPageState extends State<SongsListPage> {
                       if (!isSharePopupShown) {
                         isSharePopupShown = true;
 
-                        Share.share(
-                          widget.listItem['perma_url'].toString(),
+                        SharePlus.instance
+                            .share(
+                          ShareParams(
+                            text: widget.listItem['perma_url'].toString(),
+                          ),
                         ).whenComplete(() {
                           Timer(const Duration(milliseconds: 500), () {
                             isSharePopupShown = false;

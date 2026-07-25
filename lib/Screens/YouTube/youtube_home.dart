@@ -25,12 +25,12 @@ import 'package:blackhole/Services/youtube_services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 bool status = false;
-List searchedList = Hive.box('cache').get('ytHome', defaultValue: []) as List;
-List headList = Hive.box('cache').get('ytHomeHead', defaultValue: []) as List;
+List searchedList = AppDb.box('cache').get('ytHome', defaultValue: []) as List;
+List headList = AppDb.box('cache').get('ytHomeHead', defaultValue: []) as List;
 
 class YouTube extends StatefulWidget {
   const YouTube({super.key});
@@ -42,9 +42,9 @@ class YouTube extends StatefulWidget {
 class _YouTubeState extends State<YouTube>
     with AutomaticKeepAliveClientMixin<YouTube> {
   // List ytSearch =
-  // Hive.box('settings').get('ytSearch', defaultValue: []) as List;
+  // AppDb.box('settings').get('ytSearch', defaultValue: []) as List;
   // bool showHistory =
-  // Hive.box('settings').get('showHistory', defaultValue: true) as bool;
+  // AppDb.box('settings').get('showHistory', defaultValue: true) as bool;
   final TextEditingController _controller = TextEditingController();
 
   // int _currentPage = 0;
@@ -62,18 +62,22 @@ class _YouTubeState extends State<YouTube>
   void initState() {
     if (!status) {
       YouTubeServices.instance.getMusicHome().then((value) {
-        status = true;
-        if (value.isNotEmpty) {
-          setState(() {
-            searchedList = value['body'] ?? [];
-            headList = value['head'] ?? [];
-
-            Hive.box('cache').put('ytHome', value['body']);
-            Hive.box('cache').put('ytHomeHead', value['head']);
-          });
-        } else {
+        final List body = value['body'] ?? [];
+        // An empty body means the page layout changed under the parser; keep
+        // it out of the cache so the next open retries instead of showing the
+        // loader forever.
+        if (body.isEmpty) {
           status = false;
+          return;
         }
+        status = true;
+        setState(() {
+          searchedList = body;
+          headList = value['head'] ?? [];
+
+          AppDb.box('cache').put('ytHome', body);
+          AppDb.box('cache').put('ytHomeHead', headList);
+        });
       });
     }
     // if (headList.isNotEmpty) {
@@ -148,7 +152,7 @@ class _YouTubeState extends State<YouTube>
                                 opaque: false,
                                 pageBuilder: (_, __, ___) => SearchPage(
                                   query: headList[index]['title'].toString(),
-                                  searchType: Hive.box('settings').get(
+                                  searchType: AppDb.box('settings').get(
                                     'searchYtMusic',
                                     defaultValue: true,
                                   ) as bool
@@ -242,7 +246,7 @@ class _YouTubeState extends State<YouTube>
                                                   query:
                                                       item['title'].toString(),
                                                   searchType:
-                                                      Hive.box('settings').get(
+                                                      AppDb.box('settings').get(
                                                     'searchYtMusic',
                                                     defaultValue: true,
                                                   ) as bool
@@ -336,7 +340,7 @@ class _YouTubeState extends State<YouTube>
                                                           Alignment.centerRight,
                                                       child: Container(
                                                         color: Colors.black
-                                                            .withOpacity(0.75),
+                                                            .withValues(alpha: 0.75),
                                                         width: (boxSize - 30) *
                                                             (16 / 9) /
                                                             2.5,
@@ -497,7 +501,7 @@ class _YouTubeState extends State<YouTube>
                   builder: (context) => SearchPage(
                     query: '',
                     fromHome: true,
-                    searchType: Hive.box('settings')
+                    searchType: AppDb.box('settings')
                             .get('searchYtMusic', defaultValue: true) as bool
                         ? 'ytm'
                         : 'yt',

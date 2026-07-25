@@ -40,8 +40,8 @@ import 'package:blackhole/Services/player_service.dart';
 import 'package:blackhole/Services/youtube_services.dart';
 import 'package:blackhole/Services/yt_music.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
 
 class SearchPage extends StatefulWidget {
@@ -72,13 +72,13 @@ class _SearchPageState extends State<SearchPage> {
   bool? fromHome;
   List<Map<dynamic, dynamic>> searchedList = [];
   String searchType =
-      Hive.box('settings').get('searchType', defaultValue: 'saavn').toString();
+      AppDb.box('settings').get('searchType', defaultValue: 'saavn').toString();
   List searchHistory =
-      Hive.box('settings').get('search', defaultValue: []) as List;
+      AppDb.box('settings').get('search', defaultValue: []) as List;
   // bool showHistory =
-  //     Hive.box('settings').get('showHistory', defaultValue: true) as bool;
+  //     AppDb.box('settings').get('showHistory', defaultValue: true) as bool;
   bool liveSearch =
-      Hive.box('settings').get('liveSearch', defaultValue: true) as bool;
+      AppDb.box('settings').get('liveSearch', defaultValue: true) as bool;
   final ValueNotifier<List<String>> topSearch = ValueNotifier<List<String>>(
     [],
   );
@@ -112,9 +112,11 @@ class _SearchPageState extends State<SearchPage> {
             .search(query == '' ? widget.query : query)
             .then((value) {
           setState(() {
-            final songSection =
-                value.firstWhere((element) => element['title'] == 'Songs');
-            songSection['allowViewAll'] = true;
+            for (final section in value) {
+              if (section['title'] == 'Songs') {
+                section['allowViewAll'] = true;
+              }
+            }
             searchedList = value;
             fetched = true;
           });
@@ -164,7 +166,7 @@ class _SearchPageState extends State<SearchPage> {
     if (searchHistory.length > 10) {
       searchHistory = searchHistory.sublist(0, 10);
     }
-    Hive.box('settings').put(
+    AppDb.box('settings').put(
       'search',
       searchHistory,
     );
@@ -181,7 +183,7 @@ class _SearchPageState extends State<SearchPage> {
           label: AppLocalizations.of(context)!.useProxy,
           onPressed: () {
             setState(() {
-              Hive.box('settings').put('useProxy', true);
+              AppDb.box('settings').put('useProxy', true);
               fetched = false;
               fetchResultCalled = false;
               searchedList = [];
@@ -275,7 +277,7 @@ class _SearchPageState extends State<SearchPage> {
                                       onDeleted: () {
                                         setState(() {
                                           searchHistory.removeAt(index);
-                                          Hive.box('settings').put(
+                                          AppDb.box('settings').put(
                                             'search',
                                             searchHistory,
                                           );
@@ -361,7 +363,7 @@ class _SearchPageState extends State<SearchPage> {
                                             selectedColor: Theme.of(context)
                                                 .colorScheme
                                                 .secondary
-                                                .withOpacity(0.2),
+                                                .withValues(alpha: 0.2),
                                             labelStyle: TextStyle(
                                               color: Theme.of(context)
                                                   .textTheme
@@ -498,7 +500,7 @@ class _SearchPageState extends State<SearchPage> {
                                                                                 final Map response = await YtMusicService().getSongData(
                                                                                   videoId: items[index]['id'].toString(),
                                                                                   data: items[index] as Map,
-                                                                                  quality: Hive.box('settings')
+                                                                                  quality: AppDb.box('settings')
                                                                                       .get(
                                                                                         'ytQuality',
                                                                                         defaultValue: 'Low',
@@ -908,7 +910,7 @@ class _SearchPageState extends State<SearchPage> {
         child: ChoiceChip(
           label: Text(element['label']!),
           selectedColor:
-              Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+              Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2),
           labelStyle: TextStyle(
             color: searchType == element['key']
                 ? Theme.of(context).colorScheme.secondary
@@ -923,9 +925,9 @@ class _SearchPageState extends State<SearchPage> {
               searchType = element['key']!;
               fetched = false;
               fetchResultCalled = false;
-              Hive.box('settings').put('searchType', element['key']);
+              AppDb.box('settings').put('searchType', element['key']);
               if (element['key'] == 'ytm' || element['key'] == 'yt') {
-                Hive.box('settings')
+                AppDb.box('settings')
                     .put('searchYtMusic', element['key'] == 'ytm');
               }
               setState(() {});

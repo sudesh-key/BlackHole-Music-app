@@ -20,26 +20,26 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:blackhole/Helpers/mediaitem_converter.dart';
 import 'package:blackhole/Helpers/songs_count.dart' as songs_count;
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 bool checkPlaylist(String name, String key) {
   if (name != 'Favorite Songs') {
-    Hive.openBox(name).then((value) {
-      return Hive.box(name).containsKey(key);
+    AppDb.openBox(name).then((value) {
+      return AppDb.box(name).containsKey(key);
     });
   }
-  return Hive.box(name).containsKey(key);
+  return AppDb.box(name).containsKey(key);
 }
 
 Future<void> removeLiked(String key) async {
-  final Box likedBox = Hive.box('Favorite Songs');
+  final Box likedBox = AppDb.box('Favorite Songs');
   likedBox.delete(key);
   // setState(() {});
 }
 
 Future<void> addMapToPlaylist(String name, Map info) async {
-  if (name != 'Favorite Songs') await Hive.openBox(name);
-  final Box playlistBox = Hive.box(name);
+  if (name != 'Favorite Songs') await AppDb.openBox(name);
+  final Box playlistBox = AppDb.box(name);
   final List songs = playlistBox.values.toList();
   info.addEntries([MapEntry('dateAdded', DateTime.now().toString())]);
   songs_count.addSongsCount(
@@ -51,8 +51,8 @@ Future<void> addMapToPlaylist(String name, Map info) async {
 }
 
 Future<void> addItemToPlaylist(String name, MediaItem mediaItem) async {
-  if (name != 'Favorite Songs') await Hive.openBox(name);
-  final Box playlistBox = Hive.box(name);
+  if (name != 'Favorite Songs') await AppDb.openBox(name);
+  final Box playlistBox = AppDb.box(name);
   final Map info = MediaItemConverter.mediaItemToMap(mediaItem);
   info.addEntries([MapEntry('dateAdded', DateTime.now().toString())]);
   final List songs = playlistBox.values.toList();
@@ -69,7 +69,7 @@ Future<void> addPlaylist(String inputName, List data) async {
   String name = inputName.replaceAll(avoid, '').replaceAll('  ', ' ');
 
   final List playlistNames =
-      Hive.box('settings').get('playlistNames', defaultValue: []) as List;
+      AppDb.box('settings').get('playlistNames', defaultValue: []) as List;
 
   if (name.trim() == '') {
     name = 'Playlist ${playlistNames.length}';
@@ -79,8 +79,8 @@ Future<void> addPlaylist(String inputName, List data) async {
     name += ' (1)';
   }
 
-  await Hive.openBox(name);
-  final Box playlistBox = Hive.box(name);
+  await AppDb.openBox(name);
+  final Box playlistBox = AppDb.box(name);
 
   songs_count.addSongsCount(
     name,
@@ -91,5 +91,5 @@ Future<void> addPlaylist(String inputName, List data) async {
   playlistBox.putAll(result);
 
   playlistNames.add(name);
-  Hive.box('settings').put('playlistNames', playlistNames);
+  AppDb.box('settings').put('playlistNames', playlistNames);
 }

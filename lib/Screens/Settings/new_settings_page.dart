@@ -9,9 +9,9 @@ import 'package:blackhole/Screens/Settings/others.dart';
 import 'package:blackhole/Screens/Settings/theme.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive_flutter/adapters.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
+import 'package:mdi_icons/mdi_icons.dart';
 
 class NewSettingsPage extends StatefulWidget {
   final Function? callback;
@@ -25,7 +25,7 @@ class _NewSettingsPageState extends State<NewSettingsPage>
     with AutomaticKeepAliveClientMixin<NewSettingsPage> {
   final TextEditingController controller = TextEditingController();
   final ValueNotifier<String> searchQuery = ValueNotifier<String>('');
-  final List sectionsToShow = Hive.box('settings').get(
+  final List sectionsToShow = AppDb.box('settings').get(
     'sectionsToShow',
     defaultValue: ['Home', 'Top Charts', 'YouTube', 'Library'],
   ) as List;

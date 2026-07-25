@@ -18,6 +18,8 @@
  */
 
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -37,6 +39,16 @@ class ExtStorageProvider {
     }
   }
 
+  /// Writing outside the app's own directory needs All files access from
+  /// Android 11 onwards; `Permission.storage` maps to the legacy storage
+  /// permissions there and always resolves to denied.
+  static Future<bool> requestStorageAccess() async {
+    final int sdkInt = (await DeviceInfoPlugin().androidInfo).version.sdkInt;
+    return requestPermission(
+      sdkInt >= 30 ? Permission.manageExternalStorage : Permission.storage,
+    );
+  }
+
   // getting external storage path
   static Future<String?> getExtStorage({
     required String dirName,
@@ -47,7 +59,7 @@ class ExtStorageProvider {
     try {
       // checking platform
       if (Platform.isAndroid) {
-        if (await requestPermission(Permission.storage)) {
+        if (await requestStorageAccess()) {
           directory = await getExternalStorageDirectory();
 
           // getting main path
@@ -76,7 +88,8 @@ class ExtStorageProvider {
             }
           }
         } else {
-          return throw 'something went wrong';
+          Logger.root.severe('Storage access denied for $dirName');
+          return null;
         }
       } else if (Platform.isIOS || Platform.isMacOS) {
         directory = await getApplicationDocumentsDirectory();

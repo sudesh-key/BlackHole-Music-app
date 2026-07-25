@@ -19,8 +19,8 @@
 
 import 'package:blackhole/CustomWidgets/snackbar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class ArtistLikeButton extends StatefulWidget {
   final double? size;
@@ -44,7 +44,7 @@ class _ArtistLikeButtonState extends State<ArtistLikeButton>
   late Animation<double> _scale;
   late Animation<double> _curve;
   Map likedArtists =
-      Hive.box('settings').get('likedArtists', defaultValue: {}) as Map;
+      AppDb.box('settings').get('likedArtists', defaultValue: {}) as Map;
 
   @override
   void initState() {
@@ -99,7 +99,7 @@ class _ArtistLikeButtonState extends State<ArtistLikeButton>
             _controller.reverse();
             likedArtists.remove(widget.data['id'].toString());
           }
-          Hive.box('settings').put('likedArtists', likedArtists);
+          AppDb.box('settings').put('likedArtists', likedArtists);
           setState(() {
             liked = !liked;
           });

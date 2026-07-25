@@ -1,0 +1,17 @@
+name: mdi_icons
+description: Minimal Material Design Icons subset used by BlackHole.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  fonts:
+    - family: Material Design Icons
+      fonts:
+        - asset: fonts/materialdesignicons-webfont.ttf

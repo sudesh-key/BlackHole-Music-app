@@ -1,9 +1,9 @@
 import 'package:blackhole/Models/image_quality.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class UrlImageGetter {
   final List<String?> _imageUrls;
-  final _enableImageOptimization = Hive.box('settings').get(
+  final _enableImageOptimization = AppDb.box('settings').get(
     'enableImageOptimization',
     defaultValue: false,
   ) as bool;

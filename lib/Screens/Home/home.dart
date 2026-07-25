@@ -41,12 +41,12 @@ import 'package:blackhole/Screens/YouTube/youtube_home.dart';
 import 'package:blackhole/Services/ext_storage_provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:logging/logging.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:mdi_icons/mdi_icons.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:persistent_bottom_nav_bar/persistent_tab_view.dart';
+import 'package:blackhole/CustomWidgets/persistent_tab_view.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class HomePage extends StatefulWidget {
@@ -58,23 +58,23 @@ class _HomePageState extends State<HomePage> {
   final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(0);
   String? appVersion;
   String name =
-      Hive.box('settings').get('name', defaultValue: 'Guest') as String;
+      AppDb.box('settings').get('name', defaultValue: 'Guest') as String;
   bool checkUpdate =
-      Hive.box('settings').get('checkUpdate', defaultValue: true) as bool;
+      AppDb.box('settings').get('checkUpdate', defaultValue: true) as bool;
   bool autoBackup =
-      Hive.box('settings').get('autoBackup', defaultValue: false) as bool;
-  List sectionsToShow = Hive.box('settings').get(
+      AppDb.box('settings').get('autoBackup', defaultValue: false) as bool;
+  List sectionsToShow = AppDb.box('settings').get(
     'sectionsToShow',
     defaultValue: ['Home', 'Top Charts', 'YouTube', 'Library'],
   ) as List;
   DateTime? backButtonPressTime;
-  final bool useDense = Hive.box('settings').get(
+  final bool useDense = AppDb.box('settings').get(
     'useDenseMini',
     defaultValue: false,
   ) as bool;
 
   void callback() {
-    sectionsToShow = Hive.box('settings').get(
+    sectionsToShow = AppDb.box('settings').get(
       'sectionsToShow',
       defaultValue: ['Home', 'Top Charts', 'YouTube', 'Library'],
     ) as List;
@@ -131,7 +131,7 @@ class _HomePageState extends State<HomePage> {
                 onPressed: () async {
                   String arch = '';
                   if (Platform.isAndroid) {
-                    List? abis = await Hive.box('settings').get('supportedAbis')
+                    List? abis = await AppDb.box('settings').get('supportedAbis')
                         as List?;
 
                     if (abis == null) {
@@ -139,7 +139,7 @@ class _HomePageState extends State<HomePage> {
                       final AndroidDeviceInfo androidDeviceInfo =
                           await deviceInfo.androidInfo;
                       abis = androidDeviceInfo.supportedAbis;
-                      await Hive.box('settings').put('supportedAbis', abis);
+                      await AppDb.box('settings').put('supportedAbis', abis);
                     }
                     if (abis.contains('arm64')) {
                       arch = 'arm64';
@@ -177,7 +177,7 @@ class _HomePageState extends State<HomePage> {
           )!
               .playlists,
         ];
-        final List playlistNames = Hive.box('settings').get(
+        final List playlistNames = AppDb.box('settings').get(
           'playlistNames',
           defaultValue: ['Favorite Songs'],
         ) as List;
@@ -199,7 +199,7 @@ class _HomePageState extends State<HomePage> {
           )!
               .playlists: playlistNames,
         };
-        final String autoBackPath = Hive.box('settings').get(
+        final String autoBackPath = AppDb.box('settings').get(
           'autoBackPath',
           defaultValue: '',
         ) as String;
@@ -208,7 +208,7 @@ class _HomePageState extends State<HomePage> {
             dirName: 'BlackHole/Backups',
             writeAccess: true,
           ).then((value) {
-            Hive.box('settings').put('autoBackPath', value);
+            AppDb.box('settings').put('autoBackPath', value);
             createBackup(
               context,
               checked,
@@ -235,7 +235,7 @@ class _HomePageState extends State<HomePage> {
                     writeAccess: true,
                   ).then(
                     (value) {
-                      Hive.box('settings').put('autoBackPath', value);
+                      AppDb.box('settings').put('autoBackPath', value);
                       createBackup(
                         context,
                         checked,
@@ -274,6 +274,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.sizeOf(context).width;
     final bool rotated = MediaQuery.sizeOf(context).height < screenWidth;
+    final double bottomInset = MediaQuery.paddingOf(context).bottom;
     final miniplayer = MiniPlayer();
     return GradientContainer(
       child: Scaffold(
@@ -325,8 +326,8 @@ class _HomePageState extends State<HomePage> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withOpacity(0.8),
-                            Colors.black.withOpacity(0.1),
+                            Colors.black.withValues(alpha: 0.8),
+                            Colors.black.withValues(alpha: 0.1),
                           ],
                         ).createShader(
                           Rect.fromLTRB(0, 0, rect.width, rect.height),
@@ -548,7 +549,7 @@ class _HomePageState extends State<HomePage> {
                     indicatorColor: Theme.of(context)
                         .colorScheme
                         .secondary
-                        .withOpacity(0.2),
+                        .withValues(alpha: 0.2),
                     leading: homeDrawer(
                       context: context,
                       padding: const EdgeInsets.symmetric(vertical: 5.0),
@@ -569,7 +570,7 @@ class _HomePageState extends State<HomePage> {
                           );
                         case 'YouTube':
                           return NavigationRailDestination(
-                            icon: const Icon(MdiIcons.youtube),
+                            icon: Icon(MdiIcons.youtube),
                             label: Text(AppLocalizations.of(context)!.youTube),
                           );
                         case 'Library':
@@ -590,7 +591,7 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             Expanded(
-              child: PersistentTabView.custom(
+              child: PersistentTabView(
                 context,
                 controller: _controller,
                 itemCount: sectionsToShow.length,
@@ -598,25 +599,29 @@ class _HomePageState extends State<HomePage> {
                     (rotated ? 0 : 70) +
                     (useDense ? 0 : 10) +
                     (rotated && useDense ? 10 : 0),
-                // confineInSafeArea: false,
                 onItemTapped: onItemTapped,
-                routeAndNavigatorSettings:
-                    CustomWidgetRouteAndNavigatorSettings(
-                  routes: namedRoutes,
-                  onGenerateRoute: (RouteSettings settings) {
-                    if (settings.name == '/player') {
-                      return PageRouteBuilder(
-                        opaque: false,
-                        pageBuilder: (_, __, ___) => const PlayScreen(),
-                      );
-                    }
-                    return HandleRoute.handleRoute(settings.name);
-                  },
-                ),
+                routes: namedRoutes,
+                onGenerateRoute: (RouteSettings settings) {
+                  if (settings.name == '/player') {
+                    return PageRouteBuilder(
+                      opaque: false,
+                      pageBuilder: (_, __, ___) => const PlayScreen(),
+                    );
+                  }
+                  return HandleRoute.handleRoute(settings.name);
+                },
                 customWidget: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    miniplayer,
+                    if (rotated)
+                      miniplayer
+                    else
+                      // The nav bar below takes care of the bottom inset.
+                      MediaQuery.removePadding(
+                        context: context,
+                        removeBottom: true,
+                        child: miniplayer,
+                      ),
                     if (!rotated)
                       ValueListenableBuilder(
                         valueListenable: _selectedIndex,
@@ -627,13 +632,13 @@ class _HomePageState extends State<HomePage> {
                         ) {
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 100),
-                            height: 60,
+                            height: 60 + bottomInset,
                             child: CustomBottomNavBar(
                               currentIndex: indexValue,
                               backgroundColor: Theme.of(context).brightness ==
                                       Brightness.dark
-                                  ? Colors.black.withOpacity(0.9)
-                                  : Colors.white.withOpacity(0.9),
+                                  ? Colors.black.withValues(alpha: 0.9)
+                                  : Colors.white.withValues(alpha: 0.9),
                               onTap: (index) {
                                 onItemTapped(index);
                               },
@@ -685,7 +690,7 @@ class _HomePageState extends State<HomePage> {
           );
         case 'YouTube':
           return CustomBottomNavBarItem(
-            icon: const Icon(MdiIcons.youtube),
+            icon: Icon(MdiIcons.youtube),
             title: Text(AppLocalizations.of(context)!.youTube),
             selectedColor: Theme.of(context).colorScheme.secondary,
           );

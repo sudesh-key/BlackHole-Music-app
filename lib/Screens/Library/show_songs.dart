@@ -21,8 +21,8 @@ import 'package:blackhole/CustomWidgets/gradient_containers.dart';
 import 'package:blackhole/CustomWidgets/image_card.dart';
 import 'package:blackhole/Services/player_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class SongsList extends StatefulWidget {
   final List data;
@@ -44,9 +44,9 @@ class _SongsListState extends State<SongsList> {
   bool offline = false;
   bool added = false;
   bool processStatus = false;
-  int sortValue = Hive.box('settings').get('sortValue', defaultValue: 1) as int;
+  int sortValue = AppDb.box('settings').get('sortValue', defaultValue: 1) as int;
   int orderValue =
-      Hive.box('settings').get('orderValue', defaultValue: 1) as int;
+      AppDb.box('settings').get('orderValue', defaultValue: 1) as int;
 
   Future<void> getSongs() async {
     added = true;
@@ -131,10 +131,10 @@ class _SongsListState extends State<SongsList> {
               onSelected: (int value) {
                 if (value < 5) {
                   sortValue = value;
-                  Hive.box('settings').put('sortValue', value);
+                  AppDb.box('settings').put('sortValue', value);
                 } else {
                   orderValue = value - 5;
-                  Hive.box('settings').put('orderValue', orderValue);
+                  AppDb.box('settings').put('orderValue', orderValue);
                 }
                 sortSongs(sortVal: sortValue, order: orderValue);
                 setState(() {});

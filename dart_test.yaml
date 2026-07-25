@@ -1,0 +1,5 @@
+# The suites under test/api talk to JioSaavn, YouTube and YouTube Music for
+# real. Stream resolution alone routinely needs more than the default 30
+# seconds, and running the files in parallel gets the requests throttled — run
+# them with `flutter test -j 1`.
+timeout: 4x

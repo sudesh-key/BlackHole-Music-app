@@ -23,7 +23,7 @@ import 'package:blackhole/CustomWidgets/image_card.dart';
 import 'package:blackhole/Screens/Player/audioplayer.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class MiniPlayer extends StatefulWidget {
   static const MiniPlayer _instance = MiniPlayer._internal();
@@ -57,7 +57,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
           final MediaItem? mediaItem = snapshot.data;
           // if (mediaItem == null) return const SizedBox();
 
-          final List preferredMiniButtons = Hive.box('settings').get(
+          final List preferredMiniButtons = AppDb.box('settings').get(
             'preferredMiniButtons',
             defaultValue: ['Like', 'Play/Pause', 'Next'],
           )?.toList() as List;
@@ -65,7 +65,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
           final bool isLocal =
               mediaItem?.artUri?.toString().startsWith('file:') ?? false;
 
-          final bool useDense = Hive.box('settings').get(
+          final bool useDense = AppDb.box('settings').get(
                 'useDenseMini',
                 defaultValue: false,
               ) as bool ||

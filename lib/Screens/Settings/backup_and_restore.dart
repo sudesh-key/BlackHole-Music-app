@@ -6,9 +6,9 @@ import 'package:blackhole/Helpers/config.dart';
 import 'package:blackhole/Helpers/picker.dart';
 import 'package:blackhole/Services/ext_storage_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:blackhole/l10n/app_localizations.dart';
 import 'package:get_it/get_it.dart';
-import 'package:hive/hive.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 
 class BackupAndRestorePage extends StatefulWidget {
   const BackupAndRestorePage({super.key});
@@ -18,9 +18,9 @@ class BackupAndRestorePage extends StatefulWidget {
 }
 
 class _BackupAndRestorePageState extends State<BackupAndRestorePage> {
-  final Box settingsBox = Hive.box('settings');
+  final Box settingsBox = AppDb.box('settings');
   final MyTheme currentTheme = GetIt.I<MyTheme>();
-  String autoBackPath = Hive.box('settings').get(
+  String autoBackPath = AppDb.box('settings').get(
     'autoBackPath',
     defaultValue: '/storage/emulated/0/BlackHole/Backups',
   ) as String;
@@ -72,7 +72,7 @@ class _BackupAndRestorePageState extends State<BackupAndRestorePage> {
                   backgroundColor: Colors.transparent,
                   context: context,
                   builder: (BuildContext context) {
-                    final List playlistNames = Hive.box('settings').get(
+                    final List playlistNames = AppDb.box('settings').get(
                       'playlistNames',
                       defaultValue: ['Favorite Songs'],
                     ) as List;
@@ -315,7 +315,7 @@ class _BackupAndRestorePageState extends State<BackupAndRestorePage> {
                         writeAccess: true,
                       ) ??
                       '/storage/emulated/0/BlackHole/Backups';
-                  Hive.box('settings').put('autoBackPath', autoBackPath);
+                  AppDb.box('settings').put('autoBackPath', autoBackPath);
                   setState(
                     () {},
                   );
@@ -337,7 +337,7 @@ class _BackupAndRestorePageState extends State<BackupAndRestorePage> {
                 );
                 if (temp.trim() != '') {
                   autoBackPath = temp;
-                  Hive.box('settings').put('autoBackPath', temp);
+                  AppDb.box('settings').put('autoBackPath', temp);
                   setState(
                     () {},
                   );
