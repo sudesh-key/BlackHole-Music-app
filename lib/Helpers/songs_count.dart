@@ -22,12 +22,14 @@ import 'package:blackhole/Services/db/app_db.dart';
 void addSongsCount(String playlistName, int len, List images) {
   final Map playlistDetails =
       AppDb.box('settings').get('playlistDetails', defaultValue: {}) as Map;
-  if (playlistDetails.containsKey(playlistName)) {
-    playlistDetails[playlistName].addAll({'count': len, 'imagesList': images});
-  } else {
-    playlistDetails.addEntries([
-      MapEntry(playlistName, {'count': len, 'imagesList': images}),
-    ]);
-  }
+  // Index assignment rather than addEntries: values read back from the
+  // database are Map<String, dynamic>, whose addEntries rejects the
+  // List<MapEntry<dynamic, dynamic>> a literal infers here. That threw for
+  // every playlist name being recorded for the first time, which aborted
+  // playlist imports with an uncaught type error and no message.
+  final Map details = (playlistDetails[playlistName] as Map?) ?? {};
+  details['count'] = len;
+  details['imagesList'] = images;
+  playlistDetails[playlistName] = details;
   AppDb.box('settings').put('playlistDetails', playlistDetails);
 }
