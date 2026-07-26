@@ -110,21 +110,25 @@ class _PersistentTabViewState extends State<PersistentTabView> {
       onPopWithResult: (result) {
         _navigatorKeys[current].currentState?.maybePop();
       },
-      child: Stack(
+      // Laid out in sequence rather than stacked: the pages used to fill the
+      // whole area with the bar painted on top, so the last row of every list
+      // sat behind the mini player and could not be scrolled to or tapped.
+      // A column reserves exactly the height the bar needs, which changes as
+      // the mini player appears and disappears.
+      child: Column(
         children: [
-          IndexedStack(
-            index: current,
-            children: List.generate(widget.itemCount, (i) {
-              return Navigator(
-                key: _navigatorKeys[i],
-                onGenerateRoute: (settings) => _generateRoute(settings, i),
-              );
-            }),
+          Expanded(
+            child: IndexedStack(
+              index: current,
+              children: List.generate(widget.itemCount, (i) {
+                return Navigator(
+                  key: _navigatorKeys[i],
+                  onGenerateRoute: (settings) => _generateRoute(settings, i),
+                );
+              }),
+            ),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: widget.customWidget,
-          ),
+          widget.customWidget,
         ],
       ),
     );
