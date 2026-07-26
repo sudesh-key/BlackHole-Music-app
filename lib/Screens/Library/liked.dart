@@ -27,6 +27,7 @@ import 'package:blackhole/CustomWidgets/image_card.dart';
 import 'package:blackhole/CustomWidgets/like_button.dart';
 import 'package:blackhole/CustomWidgets/playlist_head.dart';
 import 'package:blackhole/CustomWidgets/song_tile_trailing_menu.dart';
+import 'package:blackhole/Helpers/playlist.dart';
 import 'package:blackhole/Helpers/songs_count.dart' as songs_count;
 import 'package:blackhole/Screens/Library/show_songs.dart';
 import 'package:blackhole/Services/player_service.dart';
@@ -123,12 +124,15 @@ class _LikedSongsState extends State<LikedSongs>
   //   });
   // }
 
-  void getLiked() {
+  Future<void> getLiked() async {
     likedBox = AppDb.box(widget.playlistName);
     if (widget.fromPlaylist) {
       _songs = widget.songs!;
     } else {
-      _songs = likedBox?.values.toList() ?? [];
+      _songs = await repairRawPlaylistSongs(
+        widget.playlistName,
+        likedBox?.values.toList() ?? [],
+      );
       songs_count.addSongsCount(
         widget.playlistName,
         _songs.length,
@@ -138,6 +142,7 @@ class _LikedSongsState extends State<LikedSongs>
       );
     }
     setArtistAlbum();
+    if (mounted) setState(() {});
   }
 
   void setArtistAlbum() {

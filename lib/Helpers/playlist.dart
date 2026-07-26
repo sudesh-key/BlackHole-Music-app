@@ -18,9 +18,38 @@
  */
 
 import 'package:audio_service/audio_service.dart';
+import 'package:blackhole/Helpers/format.dart';
 import 'package:blackhole/Helpers/mediaitem_converter.dart';
 import 'package:blackhole/Helpers/songs_count.dart' as songs_count;
 import 'package:blackhole/Services/db/app_db.dart';
+import 'package:logging/logging.dart';
+
+/// Some playlists hold raw JioSaavn API responses instead of formatted songs:
+/// the flat fields the app reads (`artist`, `album`, `url`, `genre`) sit under
+/// `more_info` there, so those entries render as "Unknown" with a null artist
+/// and have no playable url. Rewrites them through the normal formatter and
+/// saves the result, so a playlist is repaired the first time it is opened.
+Future<List> repairRawPlaylistSongs(String name, List songs) async {
+  final List<Map> raw = songs
+      .whereType<Map>()
+      .where((Map song) => song['url'] == null && song['more_info'] is Map)
+      .toList();
+  if (raw.isEmpty) return songs;
+
+  Logger.root.info('Repairing ${raw.length} unformatted songs in "$name"');
+  final Box playlistBox = await AppDb.openBox(name);
+  final Map<String, dynamic> repaired = {};
+  for (final Map song in raw) {
+    final Map formatted = await FormatResponse.formatSingleSongResponse(song);
+    if (formatted.containsKey('Error')) continue;
+    if (song['dateAdded'] != null) formatted['dateAdded'] = song['dateAdded'];
+    repaired[formatted['id'].toString()] = formatted;
+  }
+  if (repaired.isEmpty) return songs;
+
+  await playlistBox.putAll(repaired);
+  return playlistBox.values.toList();
+}
 
 bool checkPlaylist(String name, String key) {
   if (name != 'Favorite Songs') {
