@@ -55,8 +55,14 @@ android {
             signingConfig = keystorePropertiesFile.exists()
                     ? signingConfigs.release
                     : signingConfigs.debug
+            // Resource shrinking must stay off: the media notification icon
+            // (`drawable/ic_stat_music_note`, passed to audio_service by name)
+            // is resolved through getIdentifier at runtime, so the shrinker
+            // sees no reference and strips it — playback then dies with
+            // "Invalid notification (no valid small icon)". It saved nothing
+            // worth having either; the size win here is code, not resources.
             shrinkResources = false
-            minifyEnabled = false
+            minifyEnabled = true
         }
     }
 

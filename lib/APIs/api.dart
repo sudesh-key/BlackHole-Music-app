@@ -24,6 +24,18 @@ import 'package:blackhole/Services/db/app_db.dart';
 import 'package:http/http.dart';
 import 'package:logging/logging.dart';
 
+/// JioSaavn could not be reached, as opposed to answering with no results.
+/// The two look the same to callers otherwise, because [SaavnAPI.getResponse]
+/// reports a network error as a 404 response.
+class SaavnRequestFailure implements Exception {
+  const SaavnRequestFailure(this.statusCode);
+
+  final int statusCode;
+
+  @override
+  String toString() => 'SaavnRequestFailure($statusCode)';
+}
+
 class SaavnAPI {
   List preferredLanguages = AppDb.box('settings')
       .get('preferredLanguage', defaultValue: ['Hindi']) as List;
@@ -485,6 +497,12 @@ class SaavnAPI {
           position[getMain['songs']['position'] as int] = 'Songs';
         }
       }
+    } else {
+      // `getResponse` turns any network error into a synthetic 404, so
+      // returning an empty list here would be indistinguishable from a search
+      // that simply matched nothing — and the UI would blame the user's
+      // region for what is usually a dropped request.
+      throw SaavnRequestFailure(res.statusCode);
     }
 
     final sortedKeys = position.entries.toList()

@@ -100,6 +100,18 @@ void main() {
       );
     });
 
+    test('an unreachable JioSaavn is a failure, not an empty result', () async {
+      // `getResponse` reports network errors as a synthetic 404. Without the
+      // throw, the search page could not tell "no results for your region"
+      // from "the request never landed" and told users to enable a proxy.
+      final SaavnAPI offline = SaavnAPI()..baseUrl = 'jiosaavn.invalid';
+
+      await expectLater(
+        offline.fetchSearchResults('kesariya'),
+        throwsA(isA<SaavnRequestFailure>()),
+      );
+    });
+
     test('album search then album songs', () async {
       final List<Map> albums =
           await api.fetchAlbums(searchQuery: 'brahmastra', type: 'album');

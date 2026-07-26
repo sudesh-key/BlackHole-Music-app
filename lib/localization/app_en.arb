@@ -585,6 +585,8 @@
   "@songs": {},
   "songsPlayed": "Songs Played",
   "@songsPlayed": {},
+  "searchUnreachable": "Couldn't reach the server. Check your connection and try again",
+  "@searchUnreachable": {},
   "sorry": "SORRY",
   "@sorry": {},
   "sponsor": "Sponsor this project",

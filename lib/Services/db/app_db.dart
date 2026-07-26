@@ -270,9 +270,25 @@ class _BoxListenable extends ChangeNotifier
   _BoxListenable(this._box);
 
   final AppBox _box;
+  bool _notificationScheduled = false;
 
   @override
   AppBox get value => _box;
 
-  void _notify() => notifyListeners();
+  /// Hive notified only after its async disk write, so the screens were
+  /// written against listeners that never fire inside the caller's stack.
+  /// This shim updates the cache synchronously, so notifying inline marks
+  /// every mounted `ValueListenableBuilder` on the box dirty in the middle of
+  /// a build whenever a screen writes from `initState` (`addSongsCount`
+  /// does). Deferring to a microtask restores the old timing — the write
+  /// itself stays visible to readers immediately — and folds a burst of
+  /// writes into a single rebuild.
+  void _notify() {
+    if (_notificationScheduled) return;
+    _notificationScheduled = true;
+    scheduleMicrotask(() {
+      _notificationScheduled = false;
+      notifyListeners();
+    });
+  }
 }

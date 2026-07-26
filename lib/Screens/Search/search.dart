@@ -68,6 +68,9 @@ class _SearchPageState extends State<SearchPage> {
   bool fetchResultCalled = false;
   bool fetched = false;
   bool alertShown = false;
+  /// The last search could not reach the service, as opposed to reaching it
+  /// and matching nothing.
+  bool searchFailed = false;
   // bool albumFetched = false;
   bool? fromHome;
   List<Map<dynamic, dynamic>> searchedList = [];
@@ -105,6 +108,7 @@ class _SearchPageState extends State<SearchPage> {
     Logger.root.info(
       'fetching search results for ${query == '' ? widget.query : query}',
     );
+    searchFailed = false;
     switch (searchType) {
       case 'ytm':
         Logger.root.info('calling yt music search');
@@ -133,12 +137,18 @@ class _SearchPageState extends State<SearchPage> {
         });
       default:
         Logger.root.info('calling saavn search');
-        searchedList = await SaavnAPI()
-            .fetchSearchResults(query == '' ? widget.query : query);
-        for (final element in searchedList) {
-          if (element['title'] != 'Top Result') {
-            element['allowViewAll'] = true;
+        try {
+          searchedList = await SaavnAPI()
+              .fetchSearchResults(query == '' ? widget.query : query);
+          for (final element in searchedList) {
+            if (element['title'] != 'Top Result') {
+              element['allowViewAll'] = true;
+            }
           }
+        } on SaavnRequestFailure catch (e) {
+          Logger.root.severe('Saavn search could not be reached', e);
+          searchedList = [];
+          searchFailed = true;
         }
         setState(() {
           fetched = true;
@@ -173,25 +183,40 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Widget nothingFound(BuildContext context) {
+    // A proxy only helps when JioSaavn answered and had nothing for this
+    // region. When the request never landed (`searchFailed`) it would not,
+    // and it has nothing to do with YouTube results either.
+    final bool suggestProxy = !searchFailed && searchType == 'saavn';
     if (!alertShown) {
-      ShowSnackBar().showSnackBar(
-        context,
-        AppLocalizations.of(context)!.useVpn,
-        duration: const Duration(seconds: 7),
-        action: SnackBarAction(
-          textColor: Theme.of(context).colorScheme.secondary,
-          label: AppLocalizations.of(context)!.useProxy,
-          onPressed: () {
-            setState(() {
-              AppDb.box('settings').put('useProxy', true);
-              fetched = false;
-              fetchResultCalled = false;
-              searchedList = [];
-            });
-          },
-        ),
-      );
       alertShown = true;
+      final String message = searchFailed
+          ? AppLocalizations.of(context)!.searchUnreachable
+          : AppLocalizations.of(context)!.useVpn;
+      if (searchFailed || suggestProxy) {
+        // This runs from build(), where showSnackBar() is not allowed.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ShowSnackBar().showSnackBar(
+            context,
+            message,
+            duration: const Duration(seconds: 7),
+            action: suggestProxy
+                ? SnackBarAction(
+                    textColor: Theme.of(context).colorScheme.secondary,
+                    label: AppLocalizations.of(context)!.useProxy,
+                    onPressed: () {
+                      setState(() {
+                        AppDb.box('settings').put('useProxy', true);
+                        fetched = false;
+                        fetchResultCalled = false;
+                        searchedList = [];
+                      });
+                    },
+                  )
+                : null,
+          );
+        });
+      }
     }
     return emptyScreen(
       context,
@@ -200,7 +225,9 @@ class _SearchPageState extends State<SearchPage> {
       100,
       AppLocalizations.of(context)!.sorry,
       60,
-      AppLocalizations.of(context)!.resultsNotFound,
+      searchFailed
+          ? AppLocalizations.of(context)!.searchUnreachable
+          : AppLocalizations.of(context)!.resultsNotFound,
       20,
     );
   }

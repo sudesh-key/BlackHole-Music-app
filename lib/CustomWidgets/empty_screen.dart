@@ -50,27 +50,31 @@ Widget emptyScreen(
               ),
             ),
           ),
-          Column(
-            children: [
-              Text(
-                text2,
-                style: TextStyle(
-                  fontSize: size2,
-                  color: useWhite
-                      ? Colors.white
-                      : Theme.of(context).colorScheme.secondary,
-                  fontWeight: FontWeight.w600,
+          // Flexible so a long message wraps instead of overflowing the row.
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text2,
+                  style: TextStyle(
+                    fontSize: size2,
+                    color: useWhite
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.secondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              Text(
-                text3,
-                style: TextStyle(
-                  fontSize: size3,
-                  fontWeight: FontWeight.w600,
-                  color: useWhite ? Colors.white : null,
+                Text(
+                  text3,
+                  style: TextStyle(
+                    fontSize: size3,
+                    fontWeight: FontWeight.w600,
+                    color: useWhite ? Colors.white : null,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

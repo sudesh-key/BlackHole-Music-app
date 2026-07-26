@@ -105,6 +105,45 @@ void main() {
       expect(notifications, greaterThanOrEqualTo(2));
     });
 
+    test('writes notify listeners off the caller stack, never inline',
+        () async {
+      // Screens call put() from initState (addSongsCount does). Hive notified
+      // after its async disk write, so listeners were never marked dirty from
+      // inside a build; notifying inline throws "setState() called during
+      // build" for every mounted ValueListenableBuilder on the box.
+      final Box box = await AppDb.openBox('kv_notify_timing');
+      bool notified = false;
+      box.listenable().addListener(() => notified = true);
+
+      final Future<void> write = box.put('playlistDetails', {'Liked': 4});
+      expect(notified, isFalse,
+          reason: 'listeners were notified inside the caller stack');
+      // The cache is still updated synchronously, so readers see it at once.
+      expect(box.get('playlistDetails'), {'Liked': 4});
+
+      await write;
+      expect(notified, isTrue, reason: 'the notification never arrived');
+    });
+
+    test('delete and clear notify off the caller stack too', () async {
+      final Box box = await AppDb.openBox('kv_notify_timing_2');
+      await box.putAll({'a': 1, 'b': 2});
+
+      bool notified = false;
+      box.listenable().addListener(() => notified = true);
+
+      final Future<void> removal = box.delete('a');
+      expect(notified, isFalse);
+      await removal;
+      expect(notified, isTrue);
+
+      notified = false;
+      final Future<void> wipe = box.clear();
+      expect(notified, isFalse);
+      await wipe;
+      expect(notified, isTrue);
+    });
+
     test('data survives a reopen of the same box', () async {
       final Box box = await AppDb.openBox('kv_persist');
       await box.put('persisted', [1, 2, 3]);
