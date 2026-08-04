@@ -22,6 +22,7 @@ import 'dart:convert';
 import 'package:blackhole/Models/song_item.dart';
 import 'package:blackhole/Services/youtube_services.dart';
 import 'package:blackhole/Services/ytmusic/nav.dart';
+import 'package:blackhole/Services/db/app_db.dart';
 import 'package:blackhole/Services/ytmusic/playlist.dart';
 import 'package:http/http.dart';
 import 'package:logging/logging.dart';
@@ -609,8 +610,12 @@ class YtMusicService {
     required String videoId,
     Map? data,
     bool getUrl = true,
-    String quality = 'Low',
+    String? quality,
   }) async {
+    // Most callers leave this out; defaulting to the configured quality here
+    // keeps them from silently streaming at the lowest bitrate.
+    final String preferredQuality = quality ??
+        AppDb.box('settings').get('ytQuality', defaultValue: 'Low').toString();
     if (headers == null) {
       await init();
     }
@@ -658,7 +663,7 @@ class YtMusicService {
         urlsData = await YouTubeServices.instance.getYtStreamUrls(videoId);
         if (urlsData.isNotEmpty) {
           final Map finalUrlData =
-              quality == 'High' ? urlsData.last : urlsData.first;
+              preferredQuality == 'High' ? urlsData.last : urlsData.first;
           finalUrl = finalUrlData['url'].toString();
           expireAt = finalUrlData['expireAt'].toString();
           urls = urlsData.map((e) => e['url'].toString()).toList();

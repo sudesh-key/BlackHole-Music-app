@@ -42,6 +42,9 @@ class YouTubeServices {
 
   /// Stream clients in the order they are tried. `androidVr` and `android`
   /// currently resolve in about two seconds each; the rest are fallbacks.
+  /// YouTube's "ultralow" audio itags. See [getStreamInfo].
+  static const Set<int> _unplayableItags = {599, 600};
+
   static final List<List<YoutubeApiClient>> _streamClientGroups = [
     [YoutubeApiClient.androidVr, YoutubeApiClient.android],
     [YoutubeApiClient.androidSdkless, YoutubeApiClient.ios, YoutubeApiClient.tv],
@@ -874,7 +877,12 @@ class YouTubeServices {
       Logger.root.severe('No stream manifest for $videoId');
       return [];
     }
+    // ExoPlayer opens a source with `Range: bytes=0-`, and googlevideo answers
+    // that with a 403 for the "ultralow" itags while serving every other one,
+    // so a track picked from them loads and then never plays. They are dropped
+    // rather than ranked last: no quality setting should reach them.
     final List<AudioOnlyStreamInfo> sortedStreamInfo = manifest.audioOnly
+        .where((element) => !_unplayableItags.contains(element.tag))
         .toList()
       ..sort((a, b) => a.bitrate.compareTo(b.bitrate));
     // Opus/WebM streams are served with `gir=yes` and answer a range-less GET
