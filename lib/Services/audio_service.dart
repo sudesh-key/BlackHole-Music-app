@@ -495,17 +495,15 @@ class AudioPlayerHandlerImpl extends BaseAudioHandler
                     Logger.root.info(
                       'youtube link found in cache for ${mediaItem.title}',
                     );
-                    if (cacheSong) {
-                      // Change this to handle yt quality
-                      audioSource = LockCachingAudioSource(
-                        Uri.parse(cachedData.last['url'].toString()),
-                      );
-                    } else {
-                      // Change this to handle yt quality
-                      audioSource = AudioSource.uri(
-                        Uri.parse(cachedData.last['url'].toString()),
-                      );
-                    }
+                    // Streamed even when song caching is on. Caching reads
+                    // the whole file with one range-less GET, which
+                    // googlevideo will not serve — it stalls and then fails,
+                    // and just_audio's proxy hands ExoPlayer a 500, so the
+                    // track loads but never plays. Streaming lets ExoPlayer
+                    // use range requests, which googlevideo does serve.
+                    audioSource = AudioSource.uri(
+                      Uri.parse(cachedData.last['url'].toString()),
+                    );
                     mediaItem.extras!['url'] = cachedData.last['url'];
                     _mediaItemExpando[audioSource] = mediaItem;
                     return audioSource;
@@ -529,15 +527,10 @@ class AudioPlayerHandlerImpl extends BaseAudioHandler
                 }
               }
             } else {
-              if (cacheSong) {
-                audioSource = LockCachingAudioSource(
-                  Uri.parse(mediaItem.extras!['url'].toString()),
-                );
-              } else {
-                audioSource = AudioSource.uri(
-                  Uri.parse(mediaItem.extras!['url'].toString()),
-                );
-              }
+              // Streamed rather than cached, for the same reason as above.
+              audioSource = AudioSource.uri(
+                Uri.parse(mediaItem.extras!['url'].toString()),
+              );
               _mediaItemExpando[audioSource] = mediaItem;
               return audioSource;
             }
