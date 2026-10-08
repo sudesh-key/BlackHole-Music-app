@@ -28,6 +28,7 @@ import 'package:blackhole/Helpers/mediaitem_converter.dart';
 import 'package:blackhole/Helpers/playlist.dart';
 import 'package:blackhole/Screens/Player/audioplayer.dart';
 import 'package:blackhole/Services/isolate_service.dart';
+import 'package:blackhole/Services/youtube_audio_source.dart';
 import 'package:blackhole/Services/yt_music.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
@@ -435,6 +436,18 @@ class AudioPlayerHandlerImpl extends BaseAudioHandler
     addQueueItem(newItem);
   }
 
+  /// Youtube streams cannot be fetched in one piece any more, so they go
+  /// through [YouTubeAudioSource], which needs the byte length the url carries
+  /// in `clen`. Without it there is nothing to range against and the url is
+  /// played directly, as before.
+  AudioSource _youtubeSource(String url) {
+    final Uri uri = Uri.parse(url);
+    final int? length = int.tryParse(uri.queryParameters['clen'] ?? '');
+    return length == null
+        ? AudioSource.uri(uri)
+        : YouTubeAudioSource(uri: uri, sourceLength: length);
+  }
+
   AudioSource? _itemToSource(MediaItem mediaItem) {
     AudioSource? audioSource;
     try {
@@ -495,15 +508,8 @@ class AudioPlayerHandlerImpl extends BaseAudioHandler
                     Logger.root.info(
                       'youtube link found in cache for ${mediaItem.title}',
                     );
-                    // Streamed even when song caching is on. Caching reads
-                    // the whole file with one range-less GET, which
-                    // googlevideo will not serve — it stalls and then fails,
-                    // and just_audio's proxy hands ExoPlayer a 500, so the
-                    // track loads but never plays. Streaming lets ExoPlayer
-                    // use range requests, which googlevideo does serve.
-                    audioSource = AudioSource.uri(
-                      Uri.parse(cachedData.last['url'].toString()),
-                    );
+                    audioSource =
+                        _youtubeSource(cachedData.last['url'].toString());
                     mediaItem.extras!['url'] = cachedData.last['url'];
                     _mediaItemExpando[audioSource] = mediaItem;
                     return audioSource;
@@ -527,10 +533,8 @@ class AudioPlayerHandlerImpl extends BaseAudioHandler
                 }
               }
             } else {
-              // Streamed rather than cached, for the same reason as above.
-              audioSource = AudioSource.uri(
-                Uri.parse(mediaItem.extras!['url'].toString()),
-              );
+              audioSource =
+                  _youtubeSource(mediaItem.extras!['url'].toString());
               _mediaItemExpando[audioSource] = mediaItem;
               return audioSource;
             }

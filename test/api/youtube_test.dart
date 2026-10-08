@@ -6,9 +6,11 @@
 // Live checks against the plain YouTube surface: the scraped home feed, search,
 // and stream resolution through youtube_explode_dart.
 
+import 'package:blackhole/Services/youtube_audio_source.dart';
 import 'package:blackhole/Services/youtube_services.dart';
 import 'package:blackhole/Services/yt_music.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
 
 import '../test_env.dart';
@@ -104,6 +106,31 @@ void main() {
 
       expect(details['songs'] as List, isNotEmpty,
           reason: 'home feed playlist $playlistId parsed to zero songs');
+    });
+
+    test('a resolved stream can be read past one chunk', () async {
+      // googlevideo refuses whole-file and open-ended range requests, which is
+      // what both players ask for first, so audio is pulled in bounded chunks.
+      // Reading across a chunk boundary is what proves the stitching works.
+      final List<Map> urls =
+          await yt.getYtStreamUrls('Vug4YLiIsaU');
+      expect(urls, isNotEmpty, reason: 'no stream resolved');
+
+      final Uri uri = Uri.parse(urls.last['url'].toString());
+      final int clen = int.parse(uri.queryParameters['clen']!);
+      final source = YouTubeAudioSource(uri: uri, sourceLength: clen);
+
+      // Spans two chunks, which is what proves the stitching, while staying
+      // under the roughly one megabyte YouTube will serve an unattested client.
+      final int span =
+          (YouTubeAudioSource.maxChunkSize * 1.5).round().clamp(0, clen);
+      final StreamAudioResponse response = await source.request(0, span);
+      final int received = await response.stream
+          .fold<int>(0, (int sum, List<int> bytes) => sum + bytes.length);
+
+      expect(response.sourceLength, clen);
+      expect(response.contentLength, span);
+      expect(received, span, reason: 'chunks did not add up to the range');
     });
   }, skip: skipLive);
 }
