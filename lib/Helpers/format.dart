@@ -565,10 +565,17 @@ class FormatResponse {
             if (cachedDetails.isEmpty) {
               cachedDetails =
                   await SaavnAPI().fetchSongDetails(item['id'].toString());
-              AppDb.box('cache')
-                  .put(cachedDetails['id'].toString(), cachedDetails);
+              // A lookup that failed comes back empty, and storing that files
+              // a blank under the key "null" which is then served to every
+              // other mini object that fails.
+              if (cachedDetails['id'] != null) {
+                AppDb.box('cache')
+                    .put(cachedDetails['id'].toString(), cachedDetails);
+              }
             }
-            list[i] = cachedDetails;
+            // Dropped rather than left in place: an empty map renders as a
+            // card with a placeholder image and no title.
+            list[i] = cachedDetails.isEmpty ? null : cachedDetails;
             continue;
           }
           list[i] = await formatSingleSongResponse(item);
