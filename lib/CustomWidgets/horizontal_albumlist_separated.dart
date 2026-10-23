@@ -53,8 +53,8 @@ class HorizontalAlbumsListSeparated extends StatelessWidget {
       if (item['subtitle'] != null) {
         return formatString(item['subtitle']?.toString());
       }
-      final artists = item['more_info']?['artistMap']?['artists']
-          .map((artist) => artist['name'])
+      final artists = (item['more_info']?['artistMap']?['artists'] as List?)
+          ?.map((artist) => artist['name'])
           .toList();
       if (artists != null) {
         return formatString(artists?.join(', ')?.toString());

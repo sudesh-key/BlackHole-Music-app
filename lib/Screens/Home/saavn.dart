@@ -103,8 +103,8 @@ class _SaavnHomePageState extends State<SaavnHomePage>
       case 'show':
         return 'Podcast • ${(item['subtitle']?.toString() ?? '').isEmpty ? 'JioSaavn' : item['subtitle'].toString().unescape()}';
       case 'album':
-        final artists = item['more_info']?['artistMap']?['artists']
-            .map((artist) => artist['name'])
+        final artists = (item['more_info']?['artistMap']?['artists'] as List?)
+            ?.map((artist) => artist['name'])
             .toList();
         if (artists != null) {
           return 'Album • ${artists?.join(', ')?.toString().unescape()}';
@@ -113,8 +113,8 @@ class _SaavnHomePageState extends State<SaavnHomePage>
         }
         return 'Album';
       default:
-        final artists = item['more_info']?['artistMap']?['artists']
-            .map((artist) => artist['name'])
+        final artists = (item['more_info']?['artistMap']?['artists'] as List?)
+            ?.map((artist) => artist['name'])
             .toList();
         return artists?.join(', ')?.toString().unescape() ?? '';
     }
